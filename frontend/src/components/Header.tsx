@@ -15,7 +15,7 @@ export default function Header() {
   return (
     <header className="border-b bg-white/70 backdrop-blur">
       <div className="container h-14 flex items-center justify-between">
-        <span className="text-lg font-semibold">SnapX</span>
+        <span className="text-lg font-semibold">SnapVault</span>
         <nav className="text-sm space-x-6">
           {user ? (
             <>

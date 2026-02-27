@@ -54,7 +54,7 @@ export default function AuthPage() {
     <main className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="card p-8 w-full max-w-md">
         <h1 className="text-2xl font-bold text-center mb-6">
-          {isLogin ? "Login to SnapX" : "Create SnapX Account"}
+          {isLogin ? "Login to SnapVault" : "Create SnapVault Account"}
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">

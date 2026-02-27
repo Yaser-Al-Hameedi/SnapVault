@@ -4,7 +4,7 @@ import Header from "@/components/Header";
 import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "SnapX",
+  title: "SnapVault",
   description: "AI-powered receipts & documents vault",
 };
 
