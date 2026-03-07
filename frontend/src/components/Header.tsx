@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 export default function Header() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const allowedBookkeepingUsers = (process.env.NEXT_PUBLIC_BOOKKEEPING_USER_IDS || "").split(",");
 
   async function handleSignOut() {
     await signOut();
@@ -21,6 +22,9 @@ export default function Header() {
             <>
               <Link href="/" className="text-slate-600 hover:text-slate-900">Dashboard</Link>
               <Link href="/documents" className="text-slate-600 hover:text-slate-900">Documents</Link>
+              {allowedBookkeepingUsers.includes(user?.id || "") && (
+                <Link href="/bookkeeping" className="text-slate-600 hover:text-slate-900">Bookkeeping</Link>
+              )}
               <button onClick={handleSignOut} className="text-slate-600 hover:text-slate-900">
                 Sign Out
               </button>
