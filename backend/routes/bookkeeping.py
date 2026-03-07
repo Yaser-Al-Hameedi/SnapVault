@@ -71,13 +71,13 @@ async def save_entry(entry: BookeepingEntry, authorization: str = Header(None)):
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
-    supabase = get_supabase_client()
+    db = get_supabase_client()
 
     data = entry.model_dump(mode= 'json')
 
     data["user_id"] = user_id
 
-    result = supabase.table("bookkeeping_entries").insert(data).execute()
+    result = db.table("bookkeeping_entries").insert(data).execute()
 
     return result.data[0]
 
@@ -96,12 +96,12 @@ async def get_entries(month: int, year: int, authorization: str = Header(None)):
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
-    supabase = get_supabase_client()
+    db = get_supabase_client()
 
     first_day = date(year, month, 1)
     last_day = date(year, month, calendar.monthrange(year, month)[1])
 
-    query = supabase.table("bookkeeping_entries").select("*").eq("user_id", user_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
+    query = db.table("bookkeeping_entries").select("*").eq("user_id", user_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
 
     result = query.data
 
@@ -122,11 +122,11 @@ async def update_entry(entry_id: str, update_data: BookeepingUpdate, authorizati
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
     
-    supabase = get_supabase_client()
+    db = get_supabase_client()
 
     update_fields = update_data.model_dump(mode = 'json', exclude_none=True)
 
-    query = supabase.table("bookkeeping_entries").update(update_fields).eq("id", entry_id).eq("user_id", user_id)
+    query = db.table("bookkeeping_entries").update(update_fields).eq("id", entry_id).eq("user_id", user_id)
 
     result = query.execute()
 
@@ -150,9 +150,9 @@ async def delete_entry(entry_id: str, authorization: str = Header(None)):
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
     
-    supabase = get_supabase_client()
+    db = get_supabase_client()
 
-    query = supabase.table("bookkeeping_entries").delete().eq("id", entry_id).eq("user_id", user_id).execute()
+    query = db.table("bookkeeping_entries").delete().eq("id", entry_id).eq("user_id", user_id).execute()
 
     result = query.data
 
