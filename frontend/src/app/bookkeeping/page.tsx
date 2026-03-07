@@ -34,6 +34,7 @@ export default function BookkeepingPage() {
   const [file, setFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Confirmation form
   const emptyForm = () => ({
@@ -72,7 +73,7 @@ export default function BookkeepingPage() {
         body: formData,
       });
       const data = await res.json();
-      setForm(f => ({ ...f, ...data }));
+      setForm(f => ({ ...f, ...data, entry_date: data.entry_date || f.entry_date }));
       setExtracted(true);
     } catch (err) {
       console.error(err);
@@ -82,13 +83,19 @@ export default function BookkeepingPage() {
   }
 
   async function handleSave() {
+    setSaveError(null);
     try {
       const token = await getToken();
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/save`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/save`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
+      if (res.status === 409) {
+        const err = await res.json();
+        setSaveError(err.detail);
+        return;
+      }
       setExtracted(false);
       setFile(null);
       setForm(emptyForm());
@@ -217,6 +224,7 @@ export default function BookkeepingPage() {
                   </div>
                 ))}
               </div>
+              {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
               <button onClick={handleSave} className="btn btn-primary">Save Entry</button>
             </div>
           )}

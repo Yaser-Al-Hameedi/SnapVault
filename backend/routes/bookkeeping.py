@@ -73,6 +73,11 @@ async def save_entry(entry: BookeepingEntry, authorization: str = Header(None)):
 
     db = get_supabase_client()
 
+    # Check for duplicate date
+    existing = db.table("bookkeeping_entries").select("id").eq("user_id", user_id).eq("entry_date", str(entry.entry_date)).execute()
+    if existing.data:
+        raise HTTPException(status_code=409, detail=f"An entry for {entry.entry_date} already exists.")
+
     data = entry.model_dump(mode= 'json')
 
     data["user_id"] = user_id
