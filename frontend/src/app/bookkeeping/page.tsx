@@ -102,12 +102,13 @@ export default function BookkeepingPage() {
     setLoadingEntries(true);
     try {
       const token = await getToken();
+      if (!token) { setLoadingEntries(false); return; }
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/retrieve?month=${selectedMonth}&year=${selectedYear}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await res.json();
-      setEntries(data);
+      setEntries(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     } finally {
