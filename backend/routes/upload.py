@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter() # This is for all upload-related enpoints
 
-# Admin user (unlimited uploads)
-ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
+# Admin users (unlimited uploads) — comma-separated user IDs
+ADMIN_USER_IDS = [uid.strip() for uid in os.getenv("ADMIN_USER_ID", "").split(",") if uid.strip()]
 # Upload limit for regular users
 USER_UPLOAD_LIMIT = 30
 
@@ -38,7 +38,7 @@ async def upload_document(
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
     # Check upload limit for non-admin users (per-request check to prevent race conditions)
-    if user_id != ADMIN_USER_ID:
+    if user_id not in ADMIN_USER_IDS:
         supabase_client = get_supabase_client()
         result = supabase_client.table("documents").select("id", count="exact").eq("user_id", user_id).execute()
         current_count = result.count or 0
