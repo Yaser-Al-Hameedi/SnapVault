@@ -55,4 +55,24 @@ class TaskResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     tasks: List[TaskResponse]
-    
+
+class BookeepingEntry(BaseModel):
+    entry_date: date
+    payouts: float
+    cash: float
+    ebt: float
+    credit: float
+    gas_sales: float
+    grocery_sales: float
+    lotto: float
+    tax: float
+
+class BookeepingUpdate(BaseModel):
+    payouts: Optional[float] = None
+    cash: Optional[float] = None
+    ebt: Optional[float] = None
+    credit: Optional[float] = None
+    gas_sales: Optional[float] = None
+    grocery_sales: Optional[float] = None
+    lotto: Optional[float] = None
+    tax: Optional[float] = None

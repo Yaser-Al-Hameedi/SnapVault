@@ -33,3 +33,48 @@ def extract_fields(text: str) -> dict:
     info_response = json.loads(json_response)
 
     return info_response
+
+def extract_report_fields(text: str) -> dict:
+    client = OpenAI(api_key=AI_API_KEY)
+
+    report_prompt = f"""
+    You are extracting daily financial data from OCR text of a gas station daily report. The text may contain OCR errors or inconsistent formatting.
+
+    Extract the following 8 fields. Each field may appear under different names — use the aliases listed:
+
+    - payouts: look for "Payout", "Payouts", "Cash Out"
+    - cash: look for "Cash", "Safe Drop", "Cash Drop"
+    - ebt: look for "EBT", "Food Stamps", "SNAP"
+    - credit: look for "Credit", "Credit Card", "Debit", "Card Sales"
+    - gas_sales: look for "Gas", "Fuel", "Gas Sales", "Gasoline"
+    - grocery_sales: look for "Grocery", "Groceries", "Store Sales", "Retail"
+    - lotto: look for "Lotto", "Lottery", "Scratch Offs"
+    - tax: look for "Tax", "Sales Tax"
+
+    STRICT RULES:
+    - Return numbers only. No $ signs, no commas.
+    - If a category label is present but has NO value next to it, return 0. Do NOT guess or fill in a value.
+    - If a category is not found at all in the text, return 0.
+    - Never make up or estimate values. Only return what is explicitly written.
+
+    {text}
+
+    JSON: {{"payouts": 0.0, "cash": 0.0, "ebt": 0.0, "credit": 0.0, "gas_sales": 0.0, "grocery_sales": 0.0, "lotto": 0.0, "tax": 0.0}}
+    """
+
+    response = client.chat.completions.create(
+    model= "gpt-4o-mini",
+    messages=[
+            {"role": "system", "content": "You are a document extraction expert."},
+            {"role": "user", "content": report_prompt}
+    ],
+    response_format={"type": "json_object"}
+    )   
+
+    json_response = response.choices[0].message.content
+    info_response = json.loads(json_response)
+
+    return info_response
+
+    
+
