@@ -62,9 +62,22 @@ export default function BookkeepingPage() {
 
   async function handleExtract() {
     if (!file) return;
+    setSaveError(null);
     setExtracting(true);
     try {
       const token = await getToken();
+
+      // Check for duplicate before running OCR
+      const checkRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/retrieve?month=${new Date(form.entry_date).getMonth() + 1}&year=${new Date(form.entry_date).getFullYear()}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const existing = await checkRes.json();
+      if (Array.isArray(existing) && existing.some((e: BookkeepingEntry) => e.entry_date === form.entry_date)) {
+        setSaveError(`An entry for ${form.entry_date} already exists.`);
+        setExtracting(false);
+        return;
+      }
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/extract`, {
@@ -187,28 +200,29 @@ export default function BookkeepingPage() {
         {/* Upload & Extract */}
         <div className="card p-6 space-y-4 print:hidden">
           <h2 className="font-semibold">Upload Daily Report</h2>
+          <div>
+            <label className="text-sm text-slate-600 block mb-1">Date</label>
+            <input
+              type="date"
+              value={form.entry_date}
+              onChange={(e) => setForm(f => ({ ...f, entry_date: e.target.value }))}
+              className="input"
+            />
+          </div>
           <input
             type="file"
             accept="image/*,.pdf"
-            onChange={(e) => { setFile(e.target.files?.[0] || null); setExtracted(false); }}
+            onChange={(e) => { setFile(e.target.files?.[0] || null); setExtracted(false); setSaveError(null); }}
             className="input"
           />
+          {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
           <button onClick={handleExtract} disabled={!file || extracting} className="btn btn-primary">
-            {extracting ? "Extracting..." : "Extract"}
+            {extracting ? "Uploading..." : "Upload"}
           </button>
 
           {extracted && (
             <div className="space-y-4 border-t pt-4">
               <h3 className="font-medium">Confirm Values</h3>
-              <div>
-                <label className="text-sm text-slate-600 block mb-1">Date</label>
-                <input
-                  type="date"
-                  value={form.entry_date}
-                  onChange={(e) => setForm(f => ({ ...f, entry_date: e.target.value }))}
-                  className="input"
-                />
-              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {FIELDS.map(field => (
                   <div key={field}>
@@ -224,7 +238,6 @@ export default function BookkeepingPage() {
                   </div>
                 ))}
               </div>
-              {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
               <button onClick={handleSave} className="btn btn-primary">Save Entry</button>
             </div>
           )}
