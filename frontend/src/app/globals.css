@@ -15,10 +15,19 @@ body {
   @apply w-full rounded-xl border border-slate-300 px-3 py-2;
 }
 .btn {
-  @apply inline-flex items-center justify-center rounded-xl px-4 py-2 font-medium;
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2 font-medium cursor-pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+.btn:active {
+  transform: translateY(0px) scale(0.98);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 .btn-primary {
-  @apply bg-black text-white hover:opacity-90;
+  @apply bg-black text-white;
 }
 .pill {
   @apply rounded-full px-2 py-0.5 text-xs font-medium;
