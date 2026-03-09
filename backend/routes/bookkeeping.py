@@ -73,8 +73,8 @@ async def save_entry(entry: BookeepingEntry, authorization: str = Header(None)):
 
     db = get_supabase_client()
 
-    # Check for duplicate date
-    existing = db.table("bookkeeping_entries").select("id").eq("user_id", user_id).eq("entry_date", str(entry.entry_date)).execute()
+    # Check for duplicate date within same store
+    existing = db.table("bookkeeping_entries").select("id").eq("user_id", user_id).eq("store_id", entry.store_id).eq("entry_date", str(entry.entry_date)).execute()
     if existing.data:
         raise HTTPException(status_code=409, detail=f"An entry for {entry.entry_date} already exists.")
 
@@ -88,7 +88,7 @@ async def save_entry(entry: BookeepingEntry, authorization: str = Header(None)):
 
 
 @router.get("/bookkeeping/retrieve")
-async def get_entries(month: int, year: int, authorization: str = Header(None)):
+async def get_entries(month: int, year: int, store_id: str, authorization: str = Header(None)):
 
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail= "Missing or invalid authorization token")
@@ -106,7 +106,7 @@ async def get_entries(month: int, year: int, authorization: str = Header(None)):
     first_day = date(year, month, 1)
     last_day = date(year, month, calendar.monthrange(year, month)[1])
 
-    query = db.table("bookkeeping_entries").select("*").eq("user_id", user_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
+    query = db.table("bookkeeping_entries").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
 
     result = query.data
 

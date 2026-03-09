@@ -56,7 +56,11 @@ class TaskResponse(BaseModel):
 class StatusResponse(BaseModel):
     tasks: List[TaskResponse]
 
+class StoreCreate(BaseModel):
+    name: str
+
 class BookeepingEntry(BaseModel):
+    store_id: str
     entry_date: date
     payouts: float
     cash: float
