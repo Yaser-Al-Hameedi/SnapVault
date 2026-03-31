@@ -40,27 +40,24 @@ def extract_report_fields(text: str) -> dict:
     report_prompt = f"""
     You are extracting daily financial data from OCR text of a gas station daily report. The text may contain OCR errors or inconsistent formatting.
 
-    Extract the following 9 fields. Each field may appear under different names — use the aliases listed:
+    Extract the following 4 fields. Each field may appear under different names — use the aliases listed:
 
     - entry_date: The date of this daily report. Look anywhere on the document for a date. Return in YYYY-MM-DD format. If not found, return null.
-    - payouts: look for "Payout", "Payouts", "Cash Out"
-    - cash: look for "Cash", "Safe Drop", "Cash Drop"
-    - ebt: look for "EBT", "Food Stamps", "SNAP"
-    - credit: look for "Credit", "Credit Card", "Debit", "Card Sales"
-    - gas_sales: look for "Gas", "Fuel", "Gas Sales", "Gasoline"
-    - grocery_sales: look for "Grocery", "Groceries", "Store Sales", "Retail"
+    - income: Add together "Grocery Sales" / "Groceries" / "Store Sales" AND "EBT" / "Food Stamps" / "SNAP". Return their combined total as a single number.
     - lotto: look for "Lotto", "Lottery", "Scratch Offs"
+    - payouts: look for "Payout", "Payouts", "Cash Out"
     - tax: look for "Tax", "Sales Tax"
 
     STRICT RULES:
     - Return numbers only for numeric fields. No $ signs, no commas.
+    - For income, find grocery sales and EBT separately then add them together.
     - If a category label is present but has NO value next to it, return 0. Do NOT guess or fill in a value.
     - If a numeric category is not found at all in the text, return 0.
     - Never make up or estimate values. Only return what is explicitly written.
 
     {text}
 
-    JSON: {{"entry_date": "YYYY-MM-DD", "payouts": 0.0, "cash": 0.0, "ebt": 0.0, "credit": 0.0, "gas_sales": 0.0, "grocery_sales": 0.0, "lotto": 0.0, "tax": 0.0}}
+    JSON: {{"entry_date": "YYYY-MM-DD", "income": 0.0, "lotto": 0.0, "payouts": 0.0, "tax": 0.0}}
     """
 
     response = client.chat.completions.create(

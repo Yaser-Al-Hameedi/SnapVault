@@ -7,14 +7,17 @@ import { useAuth } from "@/contexts/AuthContext";
 interface BookkeepingEntry {
   id: string;
   entry_date: string;
-  payouts: number;
-  cash: number;
-  ebt: number;
-  credit: number;
-  gas_sales: number;
-  grocery_sales: number;
+  income: number;
   lotto: number;
+  payouts: number;
   tax: number;
+}
+
+interface VendorPayment {
+  id: string;
+  vendor_name: string;
+  amount: number;
+  payment_date: string;
 }
 
 const MONTHS = [
@@ -22,7 +25,7 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-const FIELDS = ["payouts", "cash", "ebt", "credit", "gas_sales", "grocery_sales", "lotto", "tax"] as const;
+const FIELDS = ["income", "lotto", "payouts", "tax"] as const;
 
 export default function StoreBookkeepingPage() {
   const { user } = useAuth();
@@ -37,12 +40,12 @@ export default function StoreBookkeepingPage() {
   const [file, setFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState(false);
+  const [manualEntry, setManualEntry] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const emptyForm = () => ({
     entry_date: new Date().toISOString().split("T")[0],
-    payouts: 0, cash: 0, ebt: 0, credit: 0,
-    gas_sales: 0, grocery_sales: 0, lotto: 0, tax: 0,
+    income: 0, lotto: 0, payouts: 0, tax: 0,
   });
   const [form, setForm] = useState(emptyForm());
 
@@ -53,6 +56,11 @@ export default function StoreBookkeepingPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<BookkeepingEntry>>({});
+
+  // Vendor payments
+  const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
+  const [addingVendor, setAddingVendor] = useState(false);
+  const [vendorForm, setVendorForm] = useState({ vendor_name: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
 
   async function getToken() {
     const { supabase } = await import("@/lib/supabase");
@@ -87,7 +95,14 @@ export default function StoreBookkeepingPage() {
         body: formData,
       });
       const data = await res.json();
-      setForm(f => ({ ...f, ...data, entry_date: data.entry_date || f.entry_date }));
+      setForm(f => ({
+        ...f,
+        income: data.income ?? 0,
+        lotto: data.lotto ?? 0,
+        payouts: data.payouts ?? 0,
+        tax: data.tax ?? 0,
+        entry_date: data.entry_date || f.entry_date,
+      }));
       setExtracted(true);
     } catch (err) {
       console.error(err);
@@ -111,6 +126,7 @@ export default function StoreBookkeepingPage() {
         return;
       }
       setExtracted(false);
+      setManualEntry(false);
       setFile(null);
       setForm(emptyForm());
       fetchEntries();
@@ -165,14 +181,49 @@ export default function StoreBookkeepingPage() {
     }
   }
 
+  async function fetchVendorPayments() {
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/vendor-payments?store_id=${store_id}&month=${selectedMonth}&year=${selectedYear}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await res.json();
+    setVendorPayments(Array.isArray(data) ? data : []);
+  }
+
+  async function handleAddVendorPayment() {
+    if (!vendorForm.vendor_name.trim() || !vendorForm.amount) return;
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor-payments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...vendorForm, store_id }),
+    });
+    setVendorForm({ vendor_name: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
+    setAddingVendor(false);
+    fetchVendorPayments();
+  }
+
+  async function handleDeleteVendorPayment(id: string) {
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor-payments/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchVendorPayments();
+  }
+
   useEffect(() => { fetchStoreName(); }, [store_id]);
-  useEffect(() => { fetchEntries(); }, [selectedMonth, selectedYear, store_id]);
+  useEffect(() => { fetchEntries(); fetchVendorPayments(); }, [selectedMonth, selectedYear, store_id]);
 
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
 
+  const vendorPayoutTotal = vendorPayments.reduce((sum, p) => sum + p.amount, 0);
+
   const totals = sorted.reduce(
     (acc, e) => ({
-      income: acc.income + e.grocery_sales + e.ebt,
+      income: acc.income + e.income,
       tax: acc.tax + e.tax,
       lotto: acc.lotto + e.lotto,
       payout: acc.payout + e.payouts,
@@ -180,7 +231,8 @@ export default function StoreBookkeepingPage() {
     { income: 0, tax: 0, lotto: 0, payout: 0 }
   );
 
-  const profit = totals.income - totals.payout;
+  const totalPayout = totals.payout + vendorPayoutTotal;
+  const profit = totals.income - totalPayout;
   const years = [now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear()];
 
   if (!allowedUsers.includes(user?.id || "")) {
@@ -207,21 +259,34 @@ export default function StoreBookkeepingPage() {
 
         {/* Upload & Extract */}
         <div className="card p-6 space-y-4 print:hidden">
-          <h2 className="font-semibold">Upload Daily Report</h2>
-          <input
-            type="file"
-            accept="image/*,.pdf,.heic,.heif"
-            onChange={(e) => { setFile(e.target.files?.[0] || null); setExtracted(false); setSaveError(null); }}
-            className="input"
-          />
-          {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
-          <button onClick={handleExtract} disabled={!file || extracting} className="btn btn-primary">
-            {extracting ? "Uploading..." : "Upload"}
-          </button>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Upload Daily Report</h2>
+            <button
+              onClick={() => { setManualEntry(!manualEntry); setExtracted(false); setSaveError(null); setForm(emptyForm()); }}
+              className="text-sm text-slate-500 hover:text-slate-900 cursor-pointer transition-colors"
+            >
+              {manualEntry ? "← Back to Upload" : "Enter Manually"}
+            </button>
+          </div>
 
-          {extracted && (
+          {!manualEntry ? (
+            <>
+              <input
+                type="file"
+                accept="image/*,.pdf,.heic,.heif"
+                onChange={(e) => { setFile(e.target.files?.[0] || null); setExtracted(false); setSaveError(null); }}
+                className="input"
+              />
+              {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
+              <button onClick={handleExtract} disabled={!file || extracting} className="btn btn-primary">
+                {extracting ? "Uploading..." : "Upload"}
+              </button>
+            </>
+          ) : null}
+
+          {(extracted || manualEntry) && (
             <div className="space-y-4 border-t pt-4">
-              <h3 className="font-medium">Confirm Values</h3>
+              <h3 className="font-medium">{manualEntry ? "Enter Values" : "Confirm Values"}</h3>
               <div>
                 <label className="text-sm text-slate-600 block mb-1">Date</label>
                 <input
@@ -234,9 +299,7 @@ export default function StoreBookkeepingPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {FIELDS.map(field => (
                   <div key={field}>
-                    <label className="text-sm text-slate-600 block mb-1 capitalize">
-                      {field.replace("_", " ")}
-                    </label>
+                    <label className="text-sm text-slate-600 block mb-1 capitalize">{field}</label>
                     <input
                       type="number"
                       value={form[field]}
@@ -246,6 +309,7 @@ export default function StoreBookkeepingPage() {
                   </div>
                 ))}
               </div>
+              {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
               <button onClick={handleSave} className="btn btn-primary">Save Entry</button>
             </div>
           )}
@@ -254,18 +318,10 @@ export default function StoreBookkeepingPage() {
         {/* Monthly Table */}
         <div className="space-y-4">
           <div className="flex items-center gap-4 print:hidden">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="input"
-            >
+            <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))} className="input">
               {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
             </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="input"
-            >
+            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="input">
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <button onClick={() => window.print()} className="btn btn-primary">Print</button>
@@ -295,11 +351,11 @@ export default function StoreBookkeepingPage() {
                     {editingId === entry.id ? (
                       <>
                         <td className="py-2 pr-6">{entry.entry_date}</td>
-                        {(["grocery_sales", "tax", "lotto", "payouts"] as const).map(field => (
+                        {(["income", "tax", "lotto", "payouts"] as const).map(field => (
                           <td key={field} className="py-2 pr-6">
                             <input
                               type="number"
-                              defaultValue={field === "grocery_sales" ? entry.grocery_sales + entry.ebt : entry[field]}
+                              value={editForm[field] ?? entry[field]}
                               onChange={(e) => setEditForm(f => ({ ...f, [field]: parseFloat(e.target.value) || 0 }))}
                               className="input w-24"
                             />
@@ -313,13 +369,13 @@ export default function StoreBookkeepingPage() {
                     ) : (
                       <>
                         <td className="py-2 pr-6">{entry.entry_date}</td>
-                        <td className="py-2 pr-6">${(entry.grocery_sales + entry.ebt).toFixed(2)}</td>
+                        <td className="py-2 pr-6">${entry.income.toFixed(2)}</td>
                         <td className="py-2 pr-6">${entry.tax.toFixed(2)}</td>
                         <td className="py-2 pr-6">${entry.lotto.toFixed(2)}</td>
                         <td className="py-2 pr-6">${entry.payouts.toFixed(2)}</td>
                         <td className="py-2 print:hidden space-x-3">
                           <button
-                            onClick={() => { setEditingId(entry.id); setEditForm({}); }}
+                            onClick={() => { setEditingId(entry.id); setEditForm({ income: entry.income, lotto: entry.lotto, payouts: entry.payouts, tax: entry.tax }); }}
                             className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer"
                           >Edit</button>
                           <button
@@ -339,7 +395,7 @@ export default function StoreBookkeepingPage() {
               </tbody>
               <tfoot>
                 <tr className="font-semibold border-t border-slate-300">
-                  <td className="py-3 pr-6">Total</td>
+                  <td className="py-3 pr-6">Totals</td>
                   <td className="py-3 pr-6">${totals.income.toFixed(2)}</td>
                   <td className="py-3 pr-6">${totals.tax.toFixed(2)}</td>
                   <td className="py-3 pr-6">${totals.lotto.toFixed(2)}</td>
@@ -353,6 +409,92 @@ export default function StoreBookkeepingPage() {
                 </tr>
               </tfoot>
             </table>
+          )}
+        </div>
+
+        {/* Vendor Payments */}
+        <div className="card p-6 space-y-4 print:hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Vendor Payments</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Additional payouts not on daily reports</p>
+            </div>
+            <button onClick={() => setAddingVendor(!addingVendor)} className="btn btn-primary text-sm">
+              {addingVendor ? "Cancel" : "+ Add Payment"}
+            </button>
+          </div>
+
+          {addingVendor && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-4">
+              <div>
+                <label className="text-sm text-slate-600 block mb-1">Vendor Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Cigarette Co."
+                  value={vendorForm.vendor_name}
+                  onChange={(e) => setVendorForm(f => ({ ...f, vendor_name: e.target.value }))}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-600 block mb-1">Amount</label>
+                <input
+                  type="number"
+                  value={vendorForm.amount}
+                  onChange={(e) => setVendorForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-600 block mb-1">Date</label>
+                <input
+                  type="date"
+                  value={vendorForm.payment_date}
+                  onChange={(e) => setVendorForm(f => ({ ...f, payment_date: e.target.value }))}
+                  className="input"
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <button onClick={handleAddVendorPayment} className="btn btn-primary">Save Payment</button>
+              </div>
+            </div>
+          )}
+
+          {vendorPayments.length > 0 ? (
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b text-left text-slate-500">
+                  <th className="py-2 pr-6 font-medium">Vendor</th>
+                  <th className="py-2 pr-6 font-medium">Date</th>
+                  <th className="py-2 pr-6 font-medium">Amount</th>
+                  <th className="py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorPayments.map(p => (
+                  <tr key={p.id} className="border-b hover:bg-slate-50">
+                    <td className="py-2 pr-6">{p.vendor_name}</td>
+                    <td className="py-2 pr-6">{p.payment_date}</td>
+                    <td className="py-2 pr-6">${p.amount.toFixed(2)}</td>
+                    <td className="py-2">
+                      <button
+                        onClick={() => handleDeleteVendorPayment(p.id)}
+                        className="text-red-400 hover:text-red-600 text-xs cursor-pointer"
+                      >Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold border-t border-slate-300">
+                  <td className="py-3 pr-6" colSpan={2}>Total Vendor Payouts</td>
+                  <td className="py-3 pr-6">${vendorPayoutTotal.toFixed(2)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          ) : (
+            <p className="text-sm text-slate-400">No vendor payments this month.</p>
           )}
         </div>
       </main>

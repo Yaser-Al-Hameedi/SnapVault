@@ -62,21 +62,19 @@ class StoreCreate(BaseModel):
 class BookeepingEntry(BaseModel):
     store_id: str
     entry_date: date
-    payouts: float
-    cash: float
-    ebt: float
-    credit: float
-    gas_sales: float
-    grocery_sales: float
+    income: float
     lotto: float
+    payouts: float
     tax: float
 
 class BookeepingUpdate(BaseModel):
-    payouts: Optional[float] = None
-    cash: Optional[float] = None
-    ebt: Optional[float] = None
-    credit: Optional[float] = None
-    gas_sales: Optional[float] = None
-    grocery_sales: Optional[float] = None
+    income: Optional[float] = None
     lotto: Optional[float] = None
+    payouts: Optional[float] = None
     tax: Optional[float] = None
+
+class VendorPaymentCreate(BaseModel):
+    store_id: str
+    vendor_name: str
+    amount: float
+    payment_date: date
