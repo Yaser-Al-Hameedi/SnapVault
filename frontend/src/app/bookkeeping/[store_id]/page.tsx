@@ -223,10 +223,10 @@ export default function StoreBookkeepingPage() {
 
   const totals = sorted.reduce(
     (acc, e) => ({
-      income: acc.income + e.income,
-      tax: acc.tax + e.tax,
-      lotto: acc.lotto + e.lotto,
-      payout: acc.payout + e.payouts,
+      income: acc.income + (e.income ?? 0),
+      tax: acc.tax + (e.tax ?? 0),
+      lotto: acc.lotto + (e.lotto ?? 0),
+      payout: acc.payout + (e.payouts ?? 0),
     }),
     { income: 0, tax: 0, lotto: 0, payout: 0 }
   );
@@ -355,7 +355,7 @@ export default function StoreBookkeepingPage() {
                           <td key={field} className="py-2 pr-6">
                             <input
                               type="number"
-                              value={editForm[field] ?? entry[field]}
+                              value={editForm[field] ?? entry[field] ?? 0}
                               onChange={(e) => setEditForm(f => ({ ...f, [field]: parseFloat(e.target.value) || 0 }))}
                               className="input w-24"
                             />
@@ -369,10 +369,10 @@ export default function StoreBookkeepingPage() {
                     ) : (
                       <>
                         <td className="py-2 pr-6">{entry.entry_date}</td>
-                        <td className="py-2 pr-6">${entry.income.toFixed(2)}</td>
-                        <td className="py-2 pr-6">${entry.tax.toFixed(2)}</td>
-                        <td className="py-2 pr-6">${entry.lotto.toFixed(2)}</td>
-                        <td className="py-2 pr-6">${entry.payouts.toFixed(2)}</td>
+                        <td className="py-2 pr-6">${(entry.income ?? 0).toFixed(2)}</td>
+                        <td className="py-2 pr-6">${(entry.tax ?? 0).toFixed(2)}</td>
+                        <td className="py-2 pr-6">${(entry.lotto ?? 0).toFixed(2)}</td>
+                        <td className="py-2 pr-6">${(entry.payouts ?? 0).toFixed(2)}</td>
                         <td className="py-2 print:hidden space-x-3">
                           <button
                             onClick={() => { setEditingId(entry.id); setEditForm({ income: entry.income, lotto: entry.lotto, payouts: entry.payouts, tax: entry.tax }); }}
