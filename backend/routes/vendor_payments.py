@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Header
 from database import get_supabase_client, supabase
 from models import VendorPaymentCreate
+import calendar
 
 router = APIRouter()
 
@@ -20,7 +21,8 @@ def get_user_id(authorization: str):
 async def list_vendor_payments(store_id: str, month: int, year: int, authorization: str = Header(None)):
     user_id = get_user_id(authorization)
     db = get_supabase_client()
-    result = db.table("vendor_payments").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("payment_date", f"{year}-{month:02d}-01").lte("payment_date", f"{year}-{month:02d}-31").order("payment_date").execute()
+    last_day = calendar.monthrange(year, month)[1]
+    result = db.table("vendor_payments").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("payment_date", f"{year}-{month:02d}-01").lte("payment_date", f"{year}-{month:02d}-{last_day}").order("payment_date").execute()
     return result.data
 
 
