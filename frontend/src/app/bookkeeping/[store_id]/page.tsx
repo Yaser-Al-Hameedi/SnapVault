@@ -72,6 +72,7 @@ export default function StoreBookkeepingPage() {
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
   const [addingPayment, setAddingPayment] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ vendor_id: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
+  const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set());
 
   async function getToken() {
     const { supabase } = await import("@/lib/supabase");
@@ -518,35 +519,57 @@ export default function StoreBookkeepingPage() {
 
           {/* Grouped Vendor Payments Table */}
           {Object.keys(groupedPayments).length > 0 ? (
-            <div className="space-y-4">
-              {Object.entries(groupedPayments).map(([vendorName, payments]) => {
-                const subtotal = payments.reduce((sum, p) => sum + p.amount, 0);
-                return (
-                  <div key={vendorName}>
-                    <div className="flex items-center justify-between py-2 border-b border-slate-200">
-                      <span className="font-medium text-sm">{vendorName}</span>
-                      <span className="font-medium text-sm">${subtotal.toFixed(2)}</span>
-                    </div>
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {payments.map(p => (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <tbody>
+                  {Object.entries(groupedPayments).map(([vendorName, payments]) => {
+                    const subtotal = payments.reduce((sum, p) => sum + p.amount, 0);
+                    const isExpanded = expandedVendors.has(vendorName);
+                    return (
+                      <>
+                        <tr
+                          key={vendorName}
+                          className="bg-slate-50 border-b border-slate-200 cursor-pointer hover:bg-slate-100 print:cursor-default"
+                          onClick={() => setExpandedVendors(prev => {
+                            const next = new Set(prev);
+                            isExpanded ? next.delete(vendorName) : next.add(vendorName);
+                            return next;
+                          })}
+                        >
+                          <td className="py-2 px-3 font-medium">
+                            <span className="print:hidden text-slate-400 mr-2 text-xs">{isExpanded ? "▾" : "▸"}</span>
+                            {vendorName}
+                          </td>
+                          <td className="py-2 px-3 text-right font-medium">${subtotal.toFixed(2)}</td>
+                          <td className="py-2 px-3 print:hidden w-12"></td>
+                        </tr>
+                        {isExpanded && payments.map(p => (
                           <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="py-1.5 pr-6 text-slate-500 pl-3">{p.payment_date}</td>
-                            <td className="py-1.5 pr-6">${p.amount.toFixed(2)}</td>
-                            <td className="py-1.5 text-right print:hidden">
-                              <button onClick={() => handleDeletePayment(p.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
+                            <td className="py-1.5 pl-7 pr-3 text-slate-500">{p.payment_date}</td>
+                            <td className="py-1.5 px-3 text-right">${p.amount.toFixed(2)}</td>
+                            <td className="py-1.5 px-3 text-right print:hidden">
+                              <button onClick={(e) => { e.stopPropagation(); handleDeletePayment(p.id); }} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
                             </td>
                           </tr>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-300 font-semibold">
-                <span>Total Vendor Payouts</span>
-                <span>${vendorPayoutTotal.toFixed(2)}</span>
-              </div>
+                        {/* Always show rows on print */}
+                        {!isExpanded && payments.map(p => (
+                          <tr key={`print-${p.id}`} className="border-b border-slate-100 hidden print:table-row">
+                            <td className="py-1.5 pl-7 pr-3 text-slate-500">{p.payment_date}</td>
+                            <td className="py-1.5 px-3 text-right">${p.amount.toFixed(2)}</td>
+                            <td></td>
+                          </tr>
+                        ))}
+                      </>
+                    );
+                  })}
+                  <tr className="font-semibold border-t-2 border-slate-300">
+                    <td className="py-2 px-3">Total Vendor Payouts</td>
+                    <td className="py-2 px-3 text-right">${vendorPayoutTotal.toFixed(2)}</td>
+                    <td className="print:hidden"></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           ) : (
             <p className="text-sm text-slate-400 print:hidden">No vendor payments this month.</p>
