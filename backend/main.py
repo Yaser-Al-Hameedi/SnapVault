@@ -11,6 +11,7 @@ app.add_middleware(
         "http://localhost:3000",
         "https://snap-x-yaser-al-hameedis-projects.vercel.app",
         "https://snap-38d3ly7t7-yaser-al-hameedis-projects.vercel.app",
+        "https://snap-197gaqx6a-yaser-al-hameedis-projects.vercel.app",
     ],
     allow_origin_regex="https://snap-.*\\.vercel\\.app",
     allow_credentials=True,
