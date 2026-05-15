@@ -73,8 +73,11 @@ class BookeepingUpdate(BaseModel):
     payouts: Optional[float] = None
     tax: Optional[float] = None
 
+class VendorCreate(BaseModel):
+    name: str
+
 class VendorPaymentCreate(BaseModel):
     store_id: str
-    vendor_name: str
+    vendor_id: str
     amount: float
     payment_date: date

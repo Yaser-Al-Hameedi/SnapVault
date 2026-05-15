@@ -22,7 +22,7 @@ async def list_vendor_payments(store_id: str, month: int, year: int, authorizati
     user_id = get_user_id(authorization)
     db = get_supabase_client()
     last_day = calendar.monthrange(year, month)[1]
-    result = db.table("vendor_payments").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("payment_date", f"{year}-{month:02d}-01").lte("payment_date", f"{year}-{month:02d}-{last_day}").order("payment_date").execute()
+    result = db.table("vendor_payments").select("*, vendors(name)").eq("user_id", user_id).eq("store_id", store_id).gte("payment_date", f"{year}-{month:02d}-01").lte("payment_date", f"{year}-{month:02d}-{last_day}").order("payment_date").execute()
     return result.data
 
 

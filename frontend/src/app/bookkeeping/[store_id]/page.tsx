@@ -13,11 +13,17 @@ interface BookkeepingEntry {
   tax: number;
 }
 
+interface Vendor {
+  id: string;
+  name: string;
+}
+
 interface VendorPayment {
   id: string;
-  vendor_name: string;
+  vendor_id: string;
   amount: number;
   payment_date: string;
+  vendors: { name: string };
 }
 
 const MONTHS = [
@@ -57,10 +63,15 @@ export default function StoreBookkeepingPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<BookkeepingEntry>>({});
 
+  // Vendors
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [managingVendors, setManagingVendors] = useState(false);
+  const [newVendorName, setNewVendorName] = useState("");
+
   // Vendor payments
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
-  const [addingVendor, setAddingVendor] = useState(false);
-  const [vendorForm, setVendorForm] = useState({ vendor_name: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
+  const [addingPayment, setAddingPayment] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ vendor_id: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
 
   async function getToken() {
     const { supabase } = await import("@/lib/supabase");
@@ -79,6 +90,37 @@ export default function StoreBookkeepingPage() {
       const store = data.find((s: { id: string; name: string }) => s.id === store_id);
       if (store) setStoreName(store.name);
     }
+  }
+
+  async function fetchVendors() {
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    setVendors(Array.isArray(data) ? data : []);
+  }
+
+  async function handleAddVendor() {
+    if (!newVendorName.trim()) return;
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newVendorName.trim() }),
+    });
+    setNewVendorName("");
+    fetchVendors();
+  }
+
+  async function handleDeleteVendor(id: string) {
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchVendors();
   }
 
   async function handleExtract() {
@@ -192,20 +234,20 @@ export default function StoreBookkeepingPage() {
     setVendorPayments(Array.isArray(data) ? data : []);
   }
 
-  async function handleAddVendorPayment() {
-    if (!vendorForm.vendor_name.trim() || !vendorForm.amount) return;
+  async function handleAddPayment() {
+    if (!paymentForm.vendor_id || !paymentForm.amount) return;
     const token = await getToken();
     await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor-payments`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ ...vendorForm, store_id }),
+      body: JSON.stringify({ ...paymentForm, store_id }),
     });
-    setVendorForm({ vendor_name: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
-    setAddingVendor(false);
+    setPaymentForm({ vendor_id: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
+    setAddingPayment(false);
     fetchVendorPayments();
   }
 
-  async function handleDeleteVendorPayment(id: string) {
+  async function handleDeletePayment(id: string) {
     const token = await getToken();
     await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor-payments/${id}`, {
       method: "DELETE",
@@ -214,7 +256,7 @@ export default function StoreBookkeepingPage() {
     fetchVendorPayments();
   }
 
-  useEffect(() => { fetchStoreName(); }, [store_id]);
+  useEffect(() => { fetchStoreName(); fetchVendors(); }, [store_id]);
   useEffect(() => { fetchEntries(); fetchVendorPayments(); }, [selectedMonth, selectedYear, store_id]);
 
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
@@ -235,6 +277,14 @@ export default function StoreBookkeepingPage() {
   const profit = totals.income - totalPayout;
   const years = [now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear()];
 
+  // Group vendor payments by vendor name
+  const groupedPayments = vendorPayments.reduce((acc, p) => {
+    const name = p.vendors?.name || "Unknown";
+    if (!acc[name]) acc[name] = [];
+    acc[name].push(p);
+    return acc;
+  }, {} as Record<string, VendorPayment[]>);
+
   if (!allowedUsers.includes(user?.id || "")) {
     return (
       <ProtectedRoute>
@@ -245,13 +295,10 @@ export default function StoreBookkeepingPage() {
 
   return (
     <ProtectedRoute>
-      <main className="container py-8 space-y-8 print:py-2">
+      <main className="container py-8 space-y-8">
         {/* Header */}
         <div className="flex items-center gap-4 print:hidden">
-          <button
-            onClick={() => router.push("/bookkeeping")}
-            className="text-slate-400 hover:text-slate-900 text-sm cursor-pointer transition-colors"
-          >
+          <button onClick={() => router.push("/bookkeeping")} className="text-slate-400 hover:text-slate-900 text-sm cursor-pointer transition-colors">
             ← Stores
           </button>
           <h1 className="text-xl font-semibold">{storeName || "Bookkeeping"}</h1>
@@ -269,7 +316,7 @@ export default function StoreBookkeepingPage() {
             </button>
           </div>
 
-          {!manualEntry ? (
+          {!manualEntry && (
             <>
               <input
                 type="file"
@@ -282,19 +329,14 @@ export default function StoreBookkeepingPage() {
                 {extracting ? "Uploading..." : "Upload"}
               </button>
             </>
-          ) : null}
+          )}
 
           {(extracted || manualEntry) && (
             <div className="space-y-4 border-t pt-4">
               <h3 className="font-medium">{manualEntry ? "Enter Values" : "Confirm Values"}</h3>
               <div>
                 <label className="text-sm text-slate-600 block mb-1">Date</label>
-                <input
-                  type="date"
-                  value={form.entry_date}
-                  onChange={(e) => setForm(f => ({ ...f, entry_date: e.target.value }))}
-                  className="input"
-                />
+                <input type="date" value={form.entry_date} onChange={(e) => setForm(f => ({ ...f, entry_date: e.target.value }))} className="input" />
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {FIELDS.map(field => (
@@ -324,12 +366,10 @@ export default function StoreBookkeepingPage() {
             <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="input">
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <button onClick={() => window.print()} className="btn btn-primary">Print</button>
+            <button onClick={() => window.print()} className="btn btn-primary print:hidden">Print</button>
           </div>
 
-          <h2 className="font-semibold hidden print:block">
-            {storeName} — {MONTHS[selectedMonth - 1]} {selectedYear}
-          </h2>
+          <h2 className="font-semibold hidden print:block">{storeName} — {MONTHS[selectedMonth - 1]} {selectedYear}</h2>
 
           {loadingEntries ? (
             <div className="card p-6 text-center">Loading...</div>
@@ -374,23 +414,15 @@ export default function StoreBookkeepingPage() {
                         <td className="py-2 pr-6">${(entry.lotto ?? 0).toFixed(2)}</td>
                         <td className="py-2 pr-6">${(entry.payouts ?? 0).toFixed(2)}</td>
                         <td className="py-2 print:hidden space-x-3">
-                          <button
-                            onClick={() => { setEditingId(entry.id); setEditForm({ income: entry.income, lotto: entry.lotto, payouts: entry.payouts, tax: entry.tax }); }}
-                            className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer"
-                          >Edit</button>
-                          <button
-                            onClick={() => handleDelete(entry.id)}
-                            className="text-red-400 hover:text-red-600 text-xs cursor-pointer"
-                          >Delete</button>
+                          <button onClick={() => { setEditingId(entry.id); setEditForm({ income: entry.income, lotto: entry.lotto, payouts: entry.payouts, tax: entry.tax }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
+                          <button onClick={() => handleDelete(entry.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
                         </td>
                       </>
                     )}
                   </tr>
                 ))}
                 {sorted.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-400">No entries for this month.</td>
-                  </tr>
+                  <tr><td colSpan={6} className="py-6 text-center text-slate-400">No entries for this month.</td></tr>
                 )}
               </tbody>
               <tfoot>
@@ -412,89 +444,112 @@ export default function StoreBookkeepingPage() {
           )}
         </div>
 
-        {/* Vendor Payments */}
-        <div className="card p-6 space-y-4 print:hidden">
-          <div className="flex items-center justify-between">
+        {/* Vendor Payments — visible on screen and print */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between print:hidden">
             <div>
               <h2 className="font-semibold">Vendor Payments</h2>
               <p className="text-xs text-slate-400 mt-0.5">Additional payouts not on daily reports</p>
             </div>
-            <button onClick={() => setAddingVendor(!addingVendor)} className="btn btn-primary text-sm">
-              {addingVendor ? "Cancel" : "+ Add Payment"}
-            </button>
+            <div className="flex gap-3">
+              <button onClick={() => setManagingVendors(!managingVendors)} className="text-sm text-slate-500 hover:text-slate-900 cursor-pointer transition-colors">
+                {managingVendors ? "Done" : "Manage Vendors"}
+              </button>
+              <button onClick={() => setAddingPayment(!addingPayment)} className="btn btn-primary text-sm">
+                {addingPayment ? "Cancel" : "+ Add Payment"}
+              </button>
+            </div>
           </div>
 
-          {addingVendor && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-4">
-              <div>
-                <label className="text-sm text-slate-600 block mb-1">Vendor Name</label>
+          <h2 className="font-semibold hidden print:block">Vendor Payments</h2>
+
+          {/* Manage Vendors */}
+          {managingVendors && (
+            <div className="card p-4 space-y-3 print:hidden">
+              <p className="text-sm font-medium">Your Vendors</p>
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="e.g. Cigarette Co."
-                  value={vendorForm.vendor_name}
-                  onChange={(e) => setVendorForm(f => ({ ...f, vendor_name: e.target.value }))}
-                  className="input"
+                  placeholder="New vendor name..."
+                  value={newVendorName}
+                  onChange={(e) => setNewVendorName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddVendor()}
+                  className="input flex-1 text-sm"
                 />
+                <button onClick={handleAddVendor} className="btn btn-primary text-sm">Add</button>
               </div>
-              <div>
-                <label className="text-sm text-slate-600 block mb-1">Amount</label>
-                <input
-                  type="number"
-                  value={vendorForm.amount}
-                  onChange={(e) => setVendorForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-slate-600 block mb-1">Date</label>
-                <input
-                  type="date"
-                  value={vendorForm.payment_date}
-                  onChange={(e) => setVendorForm(f => ({ ...f, payment_date: e.target.value }))}
-                  className="input"
-                />
-              </div>
-              <div className="sm:col-span-3">
-                <button onClick={handleAddVendorPayment} className="btn btn-primary">Save Payment</button>
+              <div className="space-y-1">
+                {vendors.map(v => (
+                  <div key={v.id} className="flex items-center justify-between py-1">
+                    <span className="text-sm">{v.name}</span>
+                    <button onClick={() => handleDeleteVendor(v.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Remove</button>
+                  </div>
+                ))}
+                {vendors.length === 0 && <p className="text-xs text-slate-400">No vendors yet.</p>}
               </div>
             </div>
           )}
 
-          {vendorPayments.length > 0 ? (
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b text-left text-slate-500">
-                  <th className="py-2 pr-6 font-medium">Vendor</th>
-                  <th className="py-2 pr-6 font-medium">Date</th>
-                  <th className="py-2 pr-6 font-medium">Amount</th>
-                  <th className="py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendorPayments.map(p => (
-                  <tr key={p.id} className="border-b hover:bg-slate-50">
-                    <td className="py-2 pr-6">{p.vendor_name}</td>
-                    <td className="py-2 pr-6">{p.payment_date}</td>
-                    <td className="py-2 pr-6">${p.amount.toFixed(2)}</td>
-                    <td className="py-2">
-                      <button
-                        onClick={() => handleDeleteVendorPayment(p.id)}
-                        className="text-red-400 hover:text-red-600 text-xs cursor-pointer"
-                      >Delete</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="font-semibold border-t border-slate-300">
-                  <td className="py-3 pr-6" colSpan={2}>Total Vendor Payouts</td>
-                  <td className="py-3 pr-6">${vendorPayoutTotal.toFixed(2)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
+          {/* Add Payment Form */}
+          {addingPayment && (
+            <div className="card p-4 print:hidden">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-sm text-slate-600 block mb-1">Vendor</label>
+                  <select value={paymentForm.vendor_id} onChange={(e) => setPaymentForm(f => ({ ...f, vendor_id: e.target.value }))} className="input">
+                    <option value="">Select vendor...</option>
+                    {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 block mb-1">Amount</label>
+                  <input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))} className="input" />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 block mb-1">Date</label>
+                  <input type="date" value={paymentForm.payment_date} onChange={(e) => setPaymentForm(f => ({ ...f, payment_date: e.target.value }))} className="input" />
+                </div>
+                <div className="sm:col-span-3">
+                  <button onClick={handleAddPayment} className="btn btn-primary">Save Payment</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Grouped Vendor Payments Table */}
+          {Object.keys(groupedPayments).length > 0 ? (
+            <div className="space-y-4">
+              {Object.entries(groupedPayments).map(([vendorName, payments]) => {
+                const subtotal = payments.reduce((sum, p) => sum + p.amount, 0);
+                return (
+                  <div key={vendorName}>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-200">
+                      <span className="font-medium text-sm">{vendorName}</span>
+                      <span className="font-medium text-sm">${subtotal.toFixed(2)}</span>
+                    </div>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {payments.map(p => (
+                          <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
+                            <td className="py-1.5 pr-6 text-slate-500 pl-3">{p.payment_date}</td>
+                            <td className="py-1.5 pr-6">${p.amount.toFixed(2)}</td>
+                            <td className="py-1.5 text-right print:hidden">
+                              <button onClick={() => handleDeletePayment(p.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-300 font-semibold">
+                <span>Total Vendor Payouts</span>
+                <span>${vendorPayoutTotal.toFixed(2)}</span>
+              </div>
+            </div>
           ) : (
-            <p className="text-sm text-slate-400">No vendor payments this month.</p>
+            <p className="text-sm text-slate-400 print:hidden">No vendor payments this month.</p>
           )}
         </div>
       </main>
