@@ -43,15 +43,16 @@ def extract_report_fields(text: str) -> dict:
     Extract the following 4 fields. Each field may appear under different names — use the aliases listed:
 
     - entry_date: The date of this daily report. Look anywhere on the document for a date. Return in YYYY-MM-DD format. If not found, return null.
-    - income: Add together "Grocery Sales" / "Groceries" / "Store Sales" AND "EBT" / "Food Stamps" / "SNAP". Return their combined total as a single number.
-    - lotto: look for "Lotto", "Lottery", "Scratch Offs"
-    - payouts: look for "Payout", "Payouts", "Cash Out"
-    - tax: look for "Tax", "Sales Tax"
+    - income: Find "Store Sales" or "Grocery" value, then find "EBT" or "Food Stamps" or "SNAP" value, and add them together. IMPORTANT: do NOT include "Gas Sales", "Fuel", or any total/subtotal that combines multiple categories.
+    - lotto: look for "Lottery", "Lotto"
+    - payouts: look for "Payout", "Payouts"
+    - tax: look for "Sales Tax", "Tax"
 
     STRICT RULES:
     - Return numbers only for numeric fields. No $ signs, no commas.
-    - For income, find grocery sales and EBT separately then add them together.
-    - If a category label is present but has NO value next to it, return 0. Do NOT guess or fill in a value.
+    - For income, only use the specific "Store Sales"/"Grocery" line and "EBT" line. Never use a combined total.
+    - If EBT is zero or not present, income = store sales only.
+    - If a category label is present but has NO value next to it, return 0.
     - If a numeric category is not found at all in the text, return 0.
     - Never make up or estimate values. Only return what is explicitly written.
 
