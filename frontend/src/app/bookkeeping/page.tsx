@@ -19,7 +19,6 @@ async function getToken() {
 export default function BookkeepingPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const allowedUsers = (process.env.NEXT_PUBLIC_BOOKKEEPING_USER_IDS || "").split(",");
 
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,14 +62,6 @@ export default function BookkeepingPage() {
   }
 
   useEffect(() => { fetchStores(); }, []);
-
-  if (!allowedUsers.includes(user?.id || "")) {
-    return (
-      <ProtectedRoute>
-        <div className="container py-8 text-slate-500">Access denied.</div>
-      </ProtectedRoute>
-    );
-  }
 
   return (
     <ProtectedRoute>

@@ -46,7 +46,6 @@ export default function StoreBookkeepingPage() {
   const store_id = params.store_id as string;
   const now = new Date();
 
-  const allowedUsers = (process.env.NEXT_PUBLIC_BOOKKEEPING_USER_IDS || "").split(",");
 
   const [storeName, setStoreName] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -373,14 +372,6 @@ export default function StoreBookkeepingPage() {
     acc[name].push(p);
     return acc;
   }, {} as Record<string, VendorPayment[]>);
-
-  if (!allowedUsers.includes(user?.id || "")) {
-    return (
-      <ProtectedRoute>
-        <div className="container py-8 text-slate-500">Access denied.</div>
-      </ProtectedRoute>
-    );
-  }
 
   return (
     <ProtectedRoute>
