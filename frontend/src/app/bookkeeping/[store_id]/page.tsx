@@ -70,6 +70,8 @@ export default function StoreBookkeepingPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Record<string, number | string>>({});
+  const [addingDate, setAddingDate] = useState<string | null>(null);
+  const [addingInlineForm, setAddingInlineForm] = useState<Record<string, string>>({ income: "", payouts: "", tax: "" });
 
   // Vendors
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -246,6 +248,30 @@ export default function StoreBookkeepingPage() {
     }
   }
 
+  async function handleSaveInline(dateStr: string) {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store_id,
+          entry_date: dateStr,
+          income: parseFloat(addingInlineForm.income) || 0,
+          payouts: parseFloat(addingInlineForm.payouts) || 0,
+          tax: parseFloat(addingInlineForm.tax) || 0,
+        }),
+      });
+      if (res.ok) {
+        setAddingDate(null);
+        setAddingInlineForm({ income: "", payouts: "", tax: "" });
+        fetchEntries();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   async function fetchVendorPayments() {
     const token = await getToken();
     if (!token) return;
@@ -316,6 +342,13 @@ export default function StoreBookkeepingPage() {
   useEffect(() => { fetchEntries(); fetchVendorPayments(); fetchLotteryEntries(); }, [selectedMonth, selectedYear, store_id]);
 
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const allDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = i + 1;
+    const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    return { date: dateStr, entry: sorted.find(e => e.entry_date === dateStr) ?? null };
+  });
 
   const vendorPayoutTotal = vendorPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -441,43 +474,80 @@ export default function StoreBookkeepingPage() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(entry => (
-                  <tr key={entry.id} className="border-b hover:bg-slate-50">
-                    {editingId === entry.id ? (
-                      <>
-                        <td className="py-2 pr-6">{entry.entry_date}</td>
+                {allDays.map(({ date, entry }) => {
+                  if (entry) {
+                    return (
+                      <tr key={date} className="border-b hover:bg-slate-50">
+                        {editingId === entry.id ? (
+                          <>
+                            <td className="py-2 pr-6">{date}</td>
+                            {(["income", "tax", "payouts"] as const).map(field => (
+                              <td key={field} className="py-2 pr-6">
+                                <input
+                                  type="number"
+                                  value={editForm[field] ?? ""}
+                                  onChange={(e) => setEditForm(f => ({ ...f, [field]: e.target.value }))}
+                                  className="input w-24"
+                                />
+                              </td>
+                            ))}
+                            <td className="py-2 print:hidden space-x-2">
+                              <button onClick={() => handleUpdate(entry.id)} className="btn btn-primary text-xs px-3 py-1">Save</button>
+                              <button onClick={() => setEditingId(null)} className="text-slate-500 text-xs hover:text-slate-900 cursor-pointer">Cancel</button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-2 pr-6">{date}</td>
+                            <td className="py-2 pr-6">${(entry.income ?? 0).toFixed(2)}</td>
+                            <td className="py-2 pr-6">${(entry.tax ?? 0).toFixed(2)}</td>
+                            <td className="py-2 pr-6">${(entry.payouts ?? 0).toFixed(2)}</td>
+                            <td className="py-2 print:hidden space-x-3">
+                              <button onClick={() => { setEditingId(entry.id); setEditForm({ income: String(entry.income ?? ""), payouts: String(entry.payouts ?? ""), tax: String(entry.tax ?? "") }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
+                              <button onClick={() => handleDelete(entry.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  }
+                  // Empty day row
+                  if (addingDate === date) {
+                    return (
+                      <tr key={date} className="border-b bg-blue-50">
+                        <td className="py-2 pr-6 text-slate-400">{date}</td>
                         {(["income", "tax", "payouts"] as const).map(field => (
                           <td key={field} className="py-2 pr-6">
                             <input
                               type="number"
-                              value={editForm[field] ?? ""}
-                              onChange={(e) => setEditForm(f => ({ ...f, [field]: e.target.value }))}
+                              value={addingInlineForm[field]}
+                              onChange={(e) => setAddingInlineForm(f => ({ ...f, [field]: e.target.value }))}
                               className="input w-24"
+                              placeholder=""
                             />
                           </td>
                         ))}
                         <td className="py-2 print:hidden space-x-2">
-                          <button onClick={() => handleUpdate(entry.id)} className="btn btn-primary text-xs px-3 py-1">Save</button>
-                          <button onClick={() => setEditingId(null)} className="text-slate-500 text-xs hover:text-slate-900 cursor-pointer">Cancel</button>
+                          <button onClick={() => handleSaveInline(date)} className="btn btn-primary text-xs px-3 py-1">Save</button>
+                          <button onClick={() => setAddingDate(null)} className="text-slate-500 text-xs hover:text-slate-900 cursor-pointer">Cancel</button>
                         </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="py-2 pr-6">{entry.entry_date}</td>
-                        <td className="py-2 pr-6">${(entry.income ?? 0).toFixed(2)}</td>
-                        <td className="py-2 pr-6">${(entry.tax ?? 0).toFixed(2)}</td>
-                        <td className="py-2 pr-6">${(entry.payouts ?? 0).toFixed(2)}</td>
-                        <td className="py-2 print:hidden space-x-3">
-                          <button onClick={() => { setEditingId(entry.id); setEditForm({ income: String(entry.income ?? ""), payouts: String(entry.payouts ?? ""), tax: String(entry.tax ?? "") }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
-                          <button onClick={() => handleDelete(entry.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-                {sorted.length === 0 && (
-                  <tr><td colSpan={5} className="py-6 text-center text-slate-400">No entries for this month.</td></tr>
-                )}
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr
+                      key={date}
+                      className="border-b text-slate-300 hover:bg-slate-50 hover:text-slate-500 cursor-pointer print:hidden"
+                      onClick={() => { setAddingDate(date); setAddingInlineForm({ income: "", payouts: "", tax: "" }); setEditingId(null); }}
+                    >
+                      <td className="py-2 pr-6">{date}</td>
+                      <td className="py-2 pr-6">—</td>
+                      <td className="py-2 pr-6">—</td>
+                      <td className="py-2 pr-6">—</td>
+                      <td className="py-2 print:hidden"></td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="font-semibold border-t border-slate-300">
