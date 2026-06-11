@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 interface Store {
   id: string;
   name: string;
+  user_id: string;
 }
 
 async function getToken() {
@@ -119,7 +120,7 @@ export default function BookkeepingPage() {
                     </div>
                   </button>
                 )}
-                {deletingId !== store.id && (
+                {deletingId !== store.id && store.user_id === user?.id && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeletingId(store.id); }}
                     className="absolute top-3 right-3 w-6 h-6 rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-sm font-bold cursor-pointer"

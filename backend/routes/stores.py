@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException, Header
 from database import get_supabase_client, supabase
 from models import StoreCreate
+import os
 
 router = APIRouter()
+
+ADMIN_USER_ID = os.environ.get("ADMIN_USER_ID", "")
 
 
 def get_user_id(authorization: str):
@@ -20,7 +23,10 @@ def get_user_id(authorization: str):
 async def list_stores(authorization: str = Header(None)):
     user_id = get_user_id(authorization)
     db = get_supabase_client()
-    result = db.table("stores").select("*").eq("user_id", user_id).order("created_at").execute()
+    if ADMIN_USER_ID and user_id == ADMIN_USER_ID:
+        result = db.table("stores").select("*").order("created_at").execute()
+    else:
+        result = db.table("stores").select("*").eq("user_id", user_id).order("created_at").execute()
     return result.data
 
 

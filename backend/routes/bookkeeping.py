@@ -8,6 +8,8 @@ import uuid
 import calendar
 from datetime import date
 
+ADMIN_USER_ID = os.environ.get("ADMIN_USER_ID", "")
+
 router = APIRouter()
 
 TEMP_FOLDER = "temp_uploads"
@@ -106,7 +108,10 @@ async def get_entries(month: int, year: int, store_id: str, authorization: str =
     first_day = date(year, month, 1)
     last_day = date(year, month, calendar.monthrange(year, month)[1])
 
-    query = db.table("bookkeeping_entries").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
+    if ADMIN_USER_ID and user_id == ADMIN_USER_ID:
+        query = db.table("bookkeeping_entries").select("*").eq("store_id", store_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
+    else:
+        query = db.table("bookkeeping_entries").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
 
     result = query.data
 

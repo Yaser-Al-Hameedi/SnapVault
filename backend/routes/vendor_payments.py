@@ -2,8 +2,11 @@ from fastapi import APIRouter, HTTPException, Header
 from database import get_supabase_client, supabase
 from models import VendorPaymentCreate
 import calendar
+import os
 
 router = APIRouter()
+
+ADMIN_USER_ID = os.environ.get("ADMIN_USER_ID", "")
 
 
 def get_user_id(authorization: str):
@@ -22,8 +25,12 @@ async def list_vendor_payments(store_id: str, month: int, year: int, authorizati
     user_id = get_user_id(authorization)
     db = get_supabase_client()
     last_day = calendar.monthrange(year, month)[1]
-    payments = db.table("vendor_payments").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("payment_date", f"{year}-{month:02d}-01").lte("payment_date", f"{year}-{month:02d}-{last_day}").order("payment_date").execute().data
-    vendors = db.table("vendors").select("*").eq("user_id", user_id).execute().data
+    if ADMIN_USER_ID and user_id == ADMIN_USER_ID:
+        payments = db.table("vendor_payments").select("*").eq("store_id", store_id).gte("payment_date", f"{year}-{month:02d}-01").lte("payment_date", f"{year}-{month:02d}-{last_day}").order("payment_date").execute().data
+        vendors = db.table("vendors").select("*").execute().data
+    else:
+        payments = db.table("vendor_payments").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("payment_date", f"{year}-{month:02d}-01").lte("payment_date", f"{year}-{month:02d}-{last_day}").order("payment_date").execute().data
+        vendors = db.table("vendors").select("*").eq("user_id", user_id).execute().data
     vendor_map = {v["id"]: v["name"] for v in vendors}
     for p in payments:
         p["vendors"] = {"name": vendor_map.get(p.get("vendor_id"), "Unknown")}
