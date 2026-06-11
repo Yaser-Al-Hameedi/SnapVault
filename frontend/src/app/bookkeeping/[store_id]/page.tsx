@@ -51,7 +51,10 @@ export default function StoreBookkeepingPage() {
 
   const emptyForm = () => ({
     entry_date: new Date().toISOString().split("T")[0],
-    income: 0, lotto: 0, payouts: 0, tax: 0,
+    income: "" as number | string,
+    lotto: "" as number | string,
+    payouts: "" as number | string,
+    tax: "" as number | string,
   });
   const [form, setForm] = useState(emptyForm());
 
@@ -61,7 +64,7 @@ export default function StoreBookkeepingPage() {
   const [loadingEntries, setLoadingEntries] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<BookkeepingEntry>>({});
+  const [editForm, setEditForm] = useState<Record<string, number | string>>({});
 
   // Vendors
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -140,10 +143,10 @@ export default function StoreBookkeepingPage() {
       const data = await res.json();
       setForm(f => ({
         ...f,
-        income: data.income ?? 0,
-        lotto: data.lotto ?? 0,
-        payouts: data.payouts ?? 0,
-        tax: data.tax ?? 0,
+        income: data.income ?? "",
+        lotto: data.lotto ?? "",
+        payouts: data.payouts ?? "",
+        tax: data.tax ?? "",
         entry_date: data.entry_date || f.entry_date,
       }));
       setExtracted(true);
@@ -161,7 +164,14 @@ export default function StoreBookkeepingPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/save`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, store_id }),
+        body: JSON.stringify({
+          ...form,
+          store_id,
+          income: parseFloat(form.income as string) || 0,
+          lotto: parseFloat(form.lotto as string) || 0,
+          payouts: parseFloat(form.payouts as string) || 0,
+          tax: parseFloat(form.tax as string) || 0,
+        }),
       });
       if (res.status === 409) {
         const err = await res.json();
@@ -202,7 +212,11 @@ export default function StoreBookkeepingPage() {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookkeeping/update/${id}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(
+          Object.fromEntries(
+            Object.entries(editForm).map(([k, v]) => [k, v === "" ? 0 : parseFloat(v as string)])
+          )
+        ),
       });
       setEditingId(null);
       fetchEntries();
@@ -346,7 +360,7 @@ export default function StoreBookkeepingPage() {
                     <input
                       type="number"
                       value={form[field]}
-                      onChange={(e) => setForm(f => ({ ...f, [field]: parseFloat(e.target.value) || 0 }))}
+                      onChange={(e) => setForm(f => ({ ...f, [field]: e.target.value }))}
                       className="input w-full"
                     />
                   </div>
@@ -396,8 +410,8 @@ export default function StoreBookkeepingPage() {
                           <td key={field} className="py-2 pr-6">
                             <input
                               type="number"
-                              value={editForm[field] ?? entry[field] ?? 0}
-                              onChange={(e) => setEditForm(f => ({ ...f, [field]: parseFloat(e.target.value) || 0 }))}
+                              value={editForm[field] ?? ""}
+                              onChange={(e) => setEditForm(f => ({ ...f, [field]: e.target.value }))}
                               className="input w-24"
                             />
                           </td>
@@ -415,7 +429,7 @@ export default function StoreBookkeepingPage() {
                         <td className="py-2 pr-6">${(entry.lotto ?? 0).toFixed(2)}</td>
                         <td className="py-2 pr-6">${(entry.payouts ?? 0).toFixed(2)}</td>
                         <td className="py-2 print:hidden space-x-3">
-                          <button onClick={() => { setEditingId(entry.id); setEditForm({ income: entry.income, lotto: entry.lotto, payouts: entry.payouts, tax: entry.tax }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
+                          <button onClick={() => { setEditingId(entry.id); setEditForm({ income: String(entry.income ?? ""), lotto: String(entry.lotto ?? ""), payouts: String(entry.payouts ?? ""), tax: String(entry.tax ?? "") }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
                           <button onClick={() => handleDelete(entry.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
                         </td>
                       </>
