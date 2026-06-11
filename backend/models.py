@@ -63,15 +63,19 @@ class BookeepingEntry(BaseModel):
     store_id: str
     entry_date: date
     income: float
-    lotto: float
     payouts: float
     tax: float
 
 class BookeepingUpdate(BaseModel):
     income: Optional[float] = None
-    lotto: Optional[float] = None
     payouts: Optional[float] = None
     tax: Optional[float] = None
+
+class LotteryEntryCreate(BaseModel):
+    store_id: str
+    week_start: date
+    week_end: date
+    amount: float
 
 class VendorCreate(BaseModel):
     name: str

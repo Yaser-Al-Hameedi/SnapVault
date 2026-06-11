@@ -8,9 +8,15 @@ interface BookkeepingEntry {
   id: string;
   entry_date: string;
   income: number;
-  lotto: number;
   payouts: number;
   tax: number;
+}
+
+interface LotteryEntry {
+  id: string;
+  week_start: string;
+  week_end: string;
+  amount: number;
 }
 
 interface Vendor {
@@ -31,7 +37,7 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-const FIELDS = ["income", "lotto", "payouts", "tax"] as const;
+const FIELDS = ["income", "payouts", "tax"] as const;
 
 export default function StoreBookkeepingPage() {
   const { user } = useAuth();
@@ -52,7 +58,6 @@ export default function StoreBookkeepingPage() {
   const emptyForm = () => ({
     entry_date: new Date().toISOString().split("T")[0],
     income: "" as number | string,
-    lotto: "" as number | string,
     payouts: "" as number | string,
     tax: "" as number | string,
   });
@@ -76,6 +81,11 @@ export default function StoreBookkeepingPage() {
   const [addingPayment, setAddingPayment] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ vendor_id: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
   const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set());
+
+  // Lottery
+  const [lotteryEntries, setLotteryEntries] = useState<LotteryEntry[]>([]);
+  const [addingLottery, setAddingLottery] = useState(false);
+  const [lotteryForm, setLotteryForm] = useState({ week_start: "", week_end: "", amount: "" as number | string });
 
   async function getToken() {
     const { supabase } = await import("@/lib/supabase");
@@ -144,7 +154,6 @@ export default function StoreBookkeepingPage() {
       setForm(f => ({
         ...f,
         income: data.income ?? "",
-        lotto: data.lotto ?? "",
         payouts: data.payouts ?? "",
         tax: data.tax ?? "",
         entry_date: data.entry_date || f.entry_date,
@@ -168,7 +177,6 @@ export default function StoreBookkeepingPage() {
           ...form,
           store_id,
           income: parseFloat(form.income as string) || 0,
-          lotto: parseFloat(form.lotto as string) || 0,
           payouts: parseFloat(form.payouts as string) || 0,
           tax: parseFloat(form.tax as string) || 0,
         }),
@@ -271,8 +279,41 @@ export default function StoreBookkeepingPage() {
     fetchVendorPayments();
   }
 
+  async function fetchLotteryEntries() {
+    const token = await getToken();
+    if (!token) return;
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/lottery-entries?store_id=${store_id}&month=${selectedMonth}&year=${selectedYear}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await res.json();
+    setLotteryEntries(Array.isArray(data) ? data : []);
+  }
+
+  async function handleAddLotteryEntry() {
+    if (!lotteryForm.week_start || !lotteryForm.week_end || !lotteryForm.amount) return;
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/lottery-entries`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...lotteryForm, store_id, amount: parseFloat(lotteryForm.amount as string) || 0 }),
+    });
+    setLotteryForm({ week_start: "", week_end: "", amount: "" });
+    setAddingLottery(false);
+    fetchLotteryEntries();
+  }
+
+  async function handleDeleteLotteryEntry(id: string) {
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/lottery-entries/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchLotteryEntries();
+  }
+
   useEffect(() => { fetchStoreName(); fetchVendors(); }, [store_id]);
-  useEffect(() => { fetchEntries(); fetchVendorPayments(); }, [selectedMonth, selectedYear, store_id]);
+  useEffect(() => { fetchEntries(); fetchVendorPayments(); fetchLotteryEntries(); }, [selectedMonth, selectedYear, store_id]);
 
   const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
 
@@ -282,14 +323,14 @@ export default function StoreBookkeepingPage() {
     (acc, e) => ({
       income: acc.income + (e.income ?? 0),
       tax: acc.tax + (e.tax ?? 0),
-      lotto: acc.lotto + (e.lotto ?? 0),
       payout: acc.payout + (e.payouts ?? 0),
     }),
-    { income: 0, tax: 0, lotto: 0, payout: 0 }
+    { income: 0, tax: 0, payout: 0 }
   );
 
+  const lotteryTotal = lotteryEntries.reduce((sum, e) => sum + e.amount, 0);
   const totalPayout = totals.payout + vendorPayoutTotal;
-  const profit = totals.income - totalPayout;
+  const profit = totals.income + lotteryTotal - totalPayout;
   const years = [now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear()];
 
   // Group vendor payments by vendor name
@@ -395,7 +436,6 @@ export default function StoreBookkeepingPage() {
                   <th className="py-2 pr-6 font-medium">Date</th>
                   <th className="py-2 pr-6 font-medium">Income</th>
                   <th className="py-2 pr-6 font-medium">Tax</th>
-                  <th className="py-2 pr-6 font-medium">Lotto</th>
                   <th className="py-2 pr-6 font-medium">Payout</th>
                   <th className="py-2 print:hidden"></th>
                 </tr>
@@ -406,7 +446,7 @@ export default function StoreBookkeepingPage() {
                     {editingId === entry.id ? (
                       <>
                         <td className="py-2 pr-6">{entry.entry_date}</td>
-                        {(["income", "tax", "lotto", "payouts"] as const).map(field => (
+                        {(["income", "tax", "payouts"] as const).map(field => (
                           <td key={field} className="py-2 pr-6">
                             <input
                               type="number"
@@ -426,10 +466,9 @@ export default function StoreBookkeepingPage() {
                         <td className="py-2 pr-6">{entry.entry_date}</td>
                         <td className="py-2 pr-6">${(entry.income ?? 0).toFixed(2)}</td>
                         <td className="py-2 pr-6">${(entry.tax ?? 0).toFixed(2)}</td>
-                        <td className="py-2 pr-6">${(entry.lotto ?? 0).toFixed(2)}</td>
                         <td className="py-2 pr-6">${(entry.payouts ?? 0).toFixed(2)}</td>
                         <td className="py-2 print:hidden space-x-3">
-                          <button onClick={() => { setEditingId(entry.id); setEditForm({ income: String(entry.income ?? ""), lotto: String(entry.lotto ?? ""), payouts: String(entry.payouts ?? ""), tax: String(entry.tax ?? "") }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
+                          <button onClick={() => { setEditingId(entry.id); setEditForm({ income: String(entry.income ?? ""), payouts: String(entry.payouts ?? ""), tax: String(entry.tax ?? "") }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
                           <button onClick={() => handleDelete(entry.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
                         </td>
                       </>
@@ -437,7 +476,7 @@ export default function StoreBookkeepingPage() {
                   </tr>
                 ))}
                 {sorted.length === 0 && (
-                  <tr><td colSpan={6} className="py-6 text-center text-slate-400">No entries for this month.</td></tr>
+                  <tr><td colSpan={5} className="py-6 text-center text-slate-400">No entries for this month.</td></tr>
                 )}
               </tbody>
               <tfoot>
@@ -445,13 +484,12 @@ export default function StoreBookkeepingPage() {
                   <td className="py-3 pr-6">Totals</td>
                   <td className="py-3 pr-6">${totals.income.toFixed(2)}</td>
                   <td className="py-3 pr-6">${totals.tax.toFixed(2)}</td>
-                  <td className="py-3 pr-6">${totals.lotto.toFixed(2)}</td>
                   <td className="py-3 pr-6">${totals.payout.toFixed(2)}</td>
                   <td className="print:hidden"></td>
                 </tr>
                 <tr className="font-semibold text-green-700">
                   <td className="py-2 pr-6">Profit</td>
-                  <td className="py-2 pr-6" colSpan={4}>${profit.toFixed(2)}</td>
+                  <td className="py-2 pr-6" colSpan={3}>${profit.toFixed(2)}</td>
                   <td className="print:hidden"></td>
                 </tr>
               </tfoot>
@@ -587,6 +625,67 @@ export default function StoreBookkeepingPage() {
             </div>
           ) : (
             <p className="text-sm text-slate-400 print:hidden">No vendor payments this month.</p>
+          )}
+        </div>
+        {/* Lottery — Weekly Invoice */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between print:hidden">
+            <div>
+              <h2 className="font-semibold">Lottery</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Weekly invoice totals — added to income</p>
+            </div>
+            <button onClick={() => setAddingLottery(!addingLottery)} className="btn btn-primary text-sm">
+              {addingLottery ? "Cancel" : "+ Add Week"}
+            </button>
+          </div>
+
+          <h2 className="font-semibold hidden print:block">Lottery</h2>
+
+          {addingLottery && (
+            <div className="card p-4 print:hidden">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-sm text-slate-600 block mb-1">Week Start</label>
+                  <input type="date" value={lotteryForm.week_start} onChange={(e) => setLotteryForm(f => ({ ...f, week_start: e.target.value }))} className="input" />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 block mb-1">Week End</label>
+                  <input type="date" value={lotteryForm.week_end} onChange={(e) => setLotteryForm(f => ({ ...f, week_end: e.target.value }))} className="input" />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 block mb-1">Amount</label>
+                  <input type="number" value={lotteryForm.amount} onChange={(e) => setLotteryForm(f => ({ ...f, amount: e.target.value }))} className="input" placeholder="" />
+                </div>
+                <div className="sm:col-span-3">
+                  <button onClick={handleAddLotteryEntry} className="btn btn-primary">Save</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {lotteryEntries.length > 0 ? (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <tbody>
+                  {lotteryEntries.map(e => (
+                    <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-2 px-3">{e.week_start} — {e.week_end}</td>
+                      <td className="py-2 px-3 text-right font-medium">${e.amount.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right print:hidden">
+                        <button onClick={() => handleDeleteLotteryEntry(e.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="font-semibold border-t-2 border-slate-300">
+                    <td className="py-2 px-3">Total Lottery</td>
+                    <td className="py-2 px-3 text-right">${lotteryTotal.toFixed(2)}</td>
+                    <td className="print:hidden"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 print:hidden">No lottery entries this month.</p>
           )}
         </div>
       </main>
