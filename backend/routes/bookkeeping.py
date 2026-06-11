@@ -8,7 +8,7 @@ import uuid
 import calendar
 from datetime import date
 
-ADMIN_USER_ID = os.environ.get("ADMIN_USER_ID", "")
+ADMIN_USER_IDS = set(os.environ.get("ADMIN_USER_ID", "").split(","))
 
 router = APIRouter()
 
@@ -108,7 +108,7 @@ async def get_entries(month: int, year: int, store_id: str, authorization: str =
     first_day = date(year, month, 1)
     last_day = date(year, month, calendar.monthrange(year, month)[1])
 
-    if ADMIN_USER_ID and user_id == ADMIN_USER_ID:
+    if user_id in ADMIN_USER_IDS:
         query = db.table("bookkeeping_entries").select("*").eq("store_id", store_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()
     else:
         query = db.table("bookkeeping_entries").select("*").eq("user_id", user_id).eq("store_id", store_id).gte("entry_date", str(first_day)).lte("entry_date", str(last_day)).execute()

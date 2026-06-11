@@ -6,7 +6,7 @@ import os
 
 router = APIRouter()
 
-ADMIN_USER_ID = os.environ.get("ADMIN_USER_ID", "")
+ADMIN_USER_IDS = set(os.environ.get("ADMIN_USER_ID", "").split(","))
 
 
 def get_user_id(authorization: str):
@@ -28,7 +28,7 @@ async def list_lottery_entries(store_id: str, month: int, year: int, authorizati
     month_start = f"{year}-{month:02d}-01"
     month_end = f"{year}-{month:02d}-{last_day}"
     query = db.table("lottery_entries").select("*").eq("store_id", store_id)
-    if not (ADMIN_USER_ID and user_id == ADMIN_USER_ID):
+    if user_id not in ADMIN_USER_IDS:
         query = query.eq("user_id", user_id)
     result = query.or_(f"week_start.lte.{month_end},week_end.gte.{month_start}").order("week_start").execute()
     return result.data

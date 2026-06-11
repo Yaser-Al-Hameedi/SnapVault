@@ -5,7 +5,7 @@ import os
 
 router = APIRouter()
 
-ADMIN_USER_ID = os.environ.get("ADMIN_USER_ID", "")
+ADMIN_USER_IDS = set(os.environ.get("ADMIN_USER_ID", "").split(","))
 
 
 def get_user_id(authorization: str):
@@ -23,7 +23,7 @@ def get_user_id(authorization: str):
 async def list_stores(authorization: str = Header(None)):
     user_id = get_user_id(authorization)
     db = get_supabase_client()
-    if ADMIN_USER_ID and user_id == ADMIN_USER_ID:
+    if user_id in ADMIN_USER_IDS:
         result = db.table("stores").select("*").order("created_at").execute()
     else:
         result = db.table("stores").select("*").eq("user_id", user_id).order("created_at").execute()
