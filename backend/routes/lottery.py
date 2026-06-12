@@ -30,7 +30,7 @@ async def list_lottery_entries(store_id: str, month: int, year: int, authorizati
     query = db.table("lottery_entries").select("*").eq("store_id", store_id)
     if user_id not in ADMIN_USER_IDS:
         query = query.eq("user_id", user_id)
-    result = query.or_(f"week_start.lte.{month_end},week_end.gte.{month_start}").order("week_start").execute()
+    result = query.lte("week_start", month_end).gte("week_end", month_start).order("week_start").execute()
     return result.data
 
 
