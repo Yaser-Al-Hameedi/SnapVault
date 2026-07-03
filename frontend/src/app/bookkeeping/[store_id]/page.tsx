@@ -80,7 +80,7 @@ export default function StoreBookkeepingPage() {
   // Vendor payments
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
   const [addingPayment, setAddingPayment] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ vendor_id: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
+  const [paymentForm, setPaymentForm] = useState({ vendor_id: "", amount: "" as number | string, payment_date: new Date().toISOString().split("T")[0] });
   const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set());
 
   // Lottery
@@ -288,9 +288,9 @@ export default function StoreBookkeepingPage() {
     await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor-payments`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ ...paymentForm, store_id }),
+      body: JSON.stringify({ ...paymentForm, store_id, amount: parseFloat(paymentForm.amount as string) || 0 }),
     });
-    setPaymentForm({ vendor_id: "", amount: 0, payment_date: new Date().toISOString().split("T")[0] });
+    setPaymentForm({ vendor_id: "", amount: "", payment_date: new Date().toISOString().split("T")[0] });
     setAddingPayment(false);
     fetchVendorPayments();
   }
@@ -617,7 +617,7 @@ export default function StoreBookkeepingPage() {
                 </div>
                 <div>
                   <label className="text-sm text-slate-600 block mb-1">Amount</label>
-                  <input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))} className="input" />
+                  <input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm(f => ({ ...f, amount: e.target.value }))} className="input" />
                 </div>
                 <div>
                   <label className="text-sm text-slate-600 block mb-1">Date</label>
