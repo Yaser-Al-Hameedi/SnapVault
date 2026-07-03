@@ -1,10 +1,10 @@
-from openai import OpenAI
+import anthropic
 from config import AI_API_KEY
 import json
 
-def extract_fields(text: str) -> dict:
-    client = OpenAI(api_key=AI_API_KEY)
+client = anthropic.Anthropic(api_key=AI_API_KEY)
 
+def extract_fields(text: str) -> dict:
     prompt = f"""
     Extract from OCR text (may have errors):
 
@@ -17,34 +17,27 @@ def extract_fields(text: str) -> dict:
 
     {text}
 
-    JSON: {{"vendor_name": "...", "document_date": "YYYY-MM-DD", "total_amount": 0.00, "document_type": "..."}}
+    Return ONLY valid JSON, no explanation:
+    {{"vendor_name": "...", "document_date": "YYYY-MM-DD", "total_amount": 0.00, "document_type": "..."}}
     """
 
-    response = client.chat.completions.create(
-    model="gpt-4o-mini",  
-    messages=[
-        {"role": "system", "content": "You are a document extraction expert."},
-        {"role": "user", "content": prompt}
-    ],
-    response_format={"type": "json_object"}
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}]
     )
 
-    json_response = response.choices[0].message.content
-    info_response = json.loads(json_response)
+    return json.loads(message.content[0].text)
 
-    return info_response
 
 def extract_report_fields(text: str) -> dict:
-    client = OpenAI(api_key=AI_API_KEY)
-
-    report_prompt = f"""
+    prompt = f"""
     You are extracting daily financial data from OCR text of a gas station daily report. The text may contain OCR errors or inconsistent formatting.
 
-    Extract the following 4 fields. Each field may appear under different names — use the aliases listed:
+    Extract the following fields. Each field may appear under different names — use the aliases listed:
 
     - entry_date: The date of this daily report. Look anywhere on the document for a date. Return in YYYY-MM-DD format. If not found, return null.
     - income: Find "Store Sales" or "Grocery" value, then find "EBT" or "Food Stamps" or "SNAP" value, and add them together. IMPORTANT: do NOT include "Gas Sales", "Fuel", or any total/subtotal that combines multiple categories.
-    - lotto: look for "Lottery", "Lotto"
     - payouts: look for "Payout", "Payouts"
     - tax: look for "Sales Tax", "Tax"
 
@@ -58,22 +51,14 @@ def extract_report_fields(text: str) -> dict:
 
     {text}
 
-    JSON: {{"entry_date": "YYYY-MM-DD", "income": 0.0, "lotto": 0.0, "payouts": 0.0, "tax": 0.0}}
+    Return ONLY valid JSON, no explanation:
+    {{"entry_date": "YYYY-MM-DD", "income": 0.0, "payouts": 0.0, "tax": 0.0}}
     """
 
-    response = client.chat.completions.create(
-    model= "gpt-4o-mini",
-    messages=[
-            {"role": "system", "content": "You are a document extraction expert."},
-            {"role": "user", "content": report_prompt}
-    ],
-    response_format={"type": "json_object"}
-    )   
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}]
+    )
 
-    json_response = response.choices[0].message.content
-    info_response = json.loads(json_response)
-
-    return info_response
-
-    
-
+    return json.loads(message.content[0].text)
