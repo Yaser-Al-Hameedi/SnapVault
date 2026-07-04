@@ -559,7 +559,7 @@ export default function StoreBookkeepingPage() {
         </div>
 
         {/* Vendor Payments — visible on screen and print */}
-        <div className="space-y-4">
+        <div className="space-y-4 print-section">
           <div className="flex items-center justify-between print:hidden">
             <div>
               <h2 className="font-semibold">Vendor Payments</h2>
@@ -749,6 +749,7 @@ export default function StoreBookkeepingPage() {
             <p className="text-sm text-slate-400 print:hidden">No lottery entries this month.</p>
           )}
         </div>
+
       </main>
     </ProtectedRoute>
   );
