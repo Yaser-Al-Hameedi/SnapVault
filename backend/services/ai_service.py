@@ -1,8 +1,17 @@
 import anthropic
 from config import AI_API_KEY
 import json
+import re
 
 client = anthropic.Anthropic(api_key=AI_API_KEY)
+
+def parse_json(text: str) -> dict:
+    text = text.strip()
+    # Strip markdown code blocks if present
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    return json.loads(text)
 
 def extract_fields(text: str) -> dict:
     prompt = f"""
@@ -27,7 +36,7 @@ def extract_fields(text: str) -> dict:
         messages=[{"role": "user", "content": prompt}]
     )
 
-    return json.loads(message.content[0].text)
+    return parse_json(message.content[0].text)
 
 
 def extract_report_fields(text: str) -> dict:
@@ -61,4 +70,4 @@ def extract_report_fields(text: str) -> dict:
         messages=[{"role": "user", "content": prompt}]
     )
 
-    return json.loads(message.content[0].text)
+    return parse_json(message.content[0].text)
