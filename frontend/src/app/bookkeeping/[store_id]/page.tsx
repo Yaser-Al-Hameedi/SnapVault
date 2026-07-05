@@ -665,14 +665,6 @@ export default function StoreBookkeepingPage() {
                             </td>
                           </tr>
                         ))}
-                        {/* Always show rows on print */}
-                        {!isExpanded && payments.map(p => (
-                          <tr key={`print-${p.id}`} className="border-b border-slate-100 hidden print:table-row">
-                            <td className="py-1.5 pl-7 pr-3 text-slate-500">{p.payment_date}</td>
-                            <td className="py-1.5 px-3 text-right">${p.amount.toFixed(2)}</td>
-                            <td></td>
-                          </tr>
-                        ))}
                       </>
                     );
                   })}
