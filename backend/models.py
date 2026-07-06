@@ -77,6 +77,11 @@ class LotteryEntryCreate(BaseModel):
     week_end: date
     amount: float
 
+class LotteryEntryUpdate(BaseModel):
+    week_start: Optional[date] = None
+    week_end: Optional[date] = None
+    amount: Optional[float] = None
+
 class VendorCreate(BaseModel):
     name: str
 
@@ -85,3 +90,7 @@ class VendorPaymentCreate(BaseModel):
     vendor_id: str
     amount: float
     payment_date: date
+
+class VendorPaymentUpdate(BaseModel):
+    amount: Optional[float] = None
+    payment_date: Optional[date] = None

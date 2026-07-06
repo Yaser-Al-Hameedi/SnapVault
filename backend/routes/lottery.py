@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Header
 from database import get_supabase_client, supabase
-from models import LotteryEntryCreate
+from models import LotteryEntryCreate, LotteryEntryUpdate
 import calendar
 import os
 
@@ -52,3 +52,15 @@ async def delete_lottery_entry(entry_id: str, authorization: str = Header(None))
     if not result.data:
         raise HTTPException(status_code=404, detail="Entry not found")
     return {"message": "Deleted"}
+
+
+@router.patch("/lottery-entries/{entry_id}")
+async def update_lottery_entry(entry: LotteryEntryUpdate, entry_id: str, authorization: str = Header(None)):
+    user_id = get_user_id(authorization)
+    update_fields = entry.model_dump(mode='json', exclude_none=True)
+    db = get_supabase_client()
+    result = db.table("lottery_entries").update(update_fields).eq("id", entry_id).eq("user_id", user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"message": "Updated"}
+

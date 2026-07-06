@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Header
 from database import get_supabase_client, supabase
-from models import VendorPaymentCreate
+from models import VendorPaymentCreate, VendorPaymentUpdate
 import calendar
 import os
 
@@ -55,3 +55,14 @@ async def delete_vendor_payment(payment_id: str, authorization: str = Header(Non
     if not result.data:
         raise HTTPException(status_code=404, detail="Payment not found")
     return {"message": "Deleted"}
+
+
+@router.patch("/vendor-payments/{payment_id}")
+async def update_vendor_payment(payment_id: str, payment: VendorPaymentUpdate, authorization:str = Header(None)):
+    user_id = get_user_id(authorization)
+    update_payment = payment.model_dump(mode='json', exclude_none=True)
+    db = get_supabase_client()
+    result = db.table("vendor_payments").update(update_payment).eq("id", payment_id).eq("user_id", user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail= "Payment not found")
+    return result.data

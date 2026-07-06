@@ -87,6 +87,12 @@ export default function StoreBookkeepingPage() {
   const [lotteryEntries, setLotteryEntries] = useState<LotteryEntry[]>([]);
   const [addingLottery, setAddingLottery] = useState(false);
   const [lotteryForm, setLotteryForm] = useState({ week_start: "", week_end: "", amount: "" as number | string });
+  const [editingLotteryId, setEditingLotteryId] = useState<string | null>(null);
+  const [editLotteryForm, setEditLotteryForm] = useState({ week_start: "", week_end: "", amount: "" as number | string });
+
+  // Vendor payment editing
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editPaymentForm, setEditPaymentForm] = useState({ amount: "" as number | string, payment_date: "" });
 
   async function getToken() {
     const { supabase } = await import("@/lib/supabase");
@@ -335,6 +341,35 @@ export default function StoreBookkeepingPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     fetchLotteryEntries();
+  }
+
+  async function handleUpdateLotteryEntry(id: string) {
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/lottery-entries/${id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        week_start: editLotteryForm.week_start || undefined,
+        week_end: editLotteryForm.week_end || undefined,
+        amount: editLotteryForm.amount !== "" ? parseFloat(editLotteryForm.amount as string) : undefined,
+      }),
+    });
+    setEditingLotteryId(null);
+    fetchLotteryEntries();
+  }
+
+  async function handleUpdatePayment(id: string) {
+    const token = await getToken();
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendor-payments/${id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: editPaymentForm.amount !== "" ? parseFloat(editPaymentForm.amount as string) : undefined,
+        payment_date: editPaymentForm.payment_date || undefined,
+      }),
+    });
+    setEditingPaymentId(null);
+    fetchVendorPayments();
   }
 
   useEffect(() => { fetchStoreName(); fetchVendors(); }, [store_id]);
@@ -657,13 +692,29 @@ export default function StoreBookkeepingPage() {
                           <td className="py-2 px-3 print:hidden w-12"></td>
                         </tr>
                         {isExpanded && payments.map(p => (
-                          <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="py-1.5 pl-7 pr-3 text-slate-500">{p.payment_date}</td>
-                            <td className="py-1.5 px-3 text-right">${p.amount.toFixed(2)}</td>
-                            <td className="py-1.5 px-3 text-right print:hidden">
-                              <button onClick={(e) => { e.stopPropagation(); handleDeletePayment(p.id); }} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
-                            </td>
-                          </tr>
+                          editingPaymentId === p.id ? (
+                            <tr key={p.id} className="border-b border-slate-100 bg-blue-50">
+                              <td className="py-1.5 pl-7 pr-3">
+                                <input type="date" value={editPaymentForm.payment_date} onChange={(e) => setEditPaymentForm(f => ({ ...f, payment_date: e.target.value }))} className="input text-xs" />
+                              </td>
+                              <td className="py-1.5 px-3">
+                                <input type="number" value={editPaymentForm.amount} onChange={(e) => setEditPaymentForm(f => ({ ...f, amount: e.target.value }))} className="input text-xs w-24" />
+                              </td>
+                              <td className="py-1.5 px-3 text-right print:hidden space-x-2">
+                                <button onClick={(e) => { e.stopPropagation(); handleUpdatePayment(p.id); }} className="btn btn-primary text-xs px-2 py-0.5">Save</button>
+                                <button onClick={(e) => { e.stopPropagation(); setEditingPaymentId(null); }} className="text-slate-500 text-xs hover:text-slate-900 cursor-pointer">Cancel</button>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
+                              <td className="py-1.5 pl-7 pr-3 text-slate-500">{p.payment_date}</td>
+                              <td className="py-1.5 px-3 text-right">${p.amount.toFixed(2)}</td>
+                              <td className="py-1.5 px-3 text-right print:hidden space-x-2">
+                                <button onClick={(e) => { e.stopPropagation(); setEditingPaymentId(p.id); setEditPaymentForm({ amount: p.amount, payment_date: p.payment_date }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeletePayment(p.id); }} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
+                              </td>
+                            </tr>
+                          )
                         ))}
                       </>
                     );
@@ -721,13 +772,32 @@ export default function StoreBookkeepingPage() {
               <table className="w-full text-sm">
                 <tbody>
                   {lotteryEntries.map(e => (
-                    <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-2 px-3">{e.week_start} — {e.week_end}</td>
-                      <td className="py-2 px-3 text-right font-medium">${e.amount.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right print:hidden">
-                        <button onClick={() => handleDeleteLotteryEntry(e.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
-                      </td>
-                    </tr>
+                    editingLotteryId === e.id ? (
+                      <tr key={e.id} className="border-b border-slate-100 bg-blue-50">
+                        <td className="py-2 px-3">
+                          <div className="flex gap-2">
+                            <input type="date" value={editLotteryForm.week_start} onChange={(ev) => setEditLotteryForm(f => ({ ...f, week_start: ev.target.value }))} className="input text-xs" />
+                            <input type="date" value={editLotteryForm.week_end} onChange={(ev) => setEditLotteryForm(f => ({ ...f, week_end: ev.target.value }))} className="input text-xs" />
+                          </div>
+                        </td>
+                        <td className="py-2 px-3">
+                          <input type="number" value={editLotteryForm.amount} onChange={(ev) => setEditLotteryForm(f => ({ ...f, amount: ev.target.value }))} className="input text-xs w-24" />
+                        </td>
+                        <td className="py-2 px-3 text-right print:hidden space-x-2">
+                          <button onClick={() => handleUpdateLotteryEntry(e.id)} className="btn btn-primary text-xs px-2 py-0.5">Save</button>
+                          <button onClick={() => setEditingLotteryId(null)} className="text-slate-500 text-xs hover:text-slate-900 cursor-pointer">Cancel</button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-2 px-3">{e.week_start} — {e.week_end}</td>
+                        <td className="py-2 px-3 text-right font-medium">${e.amount.toFixed(2)}</td>
+                        <td className="py-2 px-3 text-right print:hidden space-x-2">
+                          <button onClick={() => { setEditingLotteryId(e.id); setEditLotteryForm({ week_start: e.week_start, week_end: e.week_end, amount: e.amount }); }} className="text-slate-400 hover:text-slate-900 text-xs cursor-pointer">Edit</button>
+                          <button onClick={() => handleDeleteLotteryEntry(e.id)} className="text-red-400 hover:text-red-600 text-xs cursor-pointer">Delete</button>
+                        </td>
+                      </tr>
+                    )
                   ))}
                   <tr className="font-semibold border-t-2 border-slate-300">
                     <td className="py-2 px-3">Total Lottery</td>
