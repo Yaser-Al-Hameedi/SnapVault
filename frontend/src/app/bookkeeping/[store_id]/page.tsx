@@ -334,6 +334,32 @@ export default function StoreBookkeepingPage() {
     fetchLotteryEntries();
   }
 
+  async function handleDownloadPDF() {
+    const { pdf } = await import("@react-pdf/renderer");
+    const { default: BookkeepingPDF } = await import("@/components/BookkeepingPDF");
+    const blob = await pdf(
+      <BookkeepingPDF
+        storeName={storeName}
+        month={selectedMonth}
+        year={selectedYear}
+        entries={entries}
+        allDays={allDays}
+        vendorPayments={vendorPayments}
+        lotteryEntries={lotteryEntries}
+        totals={totals}
+        vendorPayoutTotal={vendorPayoutTotal}
+        lotteryTotal={lotteryTotal}
+        profit={profit}
+      />
+    ).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${storeName}-${selectedYear}-${String(selectedMonth).padStart(2, "0")}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleDeleteLotteryEntry(id: string) {
     const token = await getToken();
     await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/lottery-entries/${id}`, {
@@ -482,6 +508,7 @@ export default function StoreBookkeepingPage() {
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <button onClick={() => window.print()} className="btn btn-primary print:hidden">Print</button>
+            <button onClick={handleDownloadPDF} className="btn btn-primary print:hidden">Download PDF</button>
           </div>
 
           <h2 className="font-semibold hidden print:block">{storeName} — {MONTHS[selectedMonth - 1]} {selectedYear}</h2>
