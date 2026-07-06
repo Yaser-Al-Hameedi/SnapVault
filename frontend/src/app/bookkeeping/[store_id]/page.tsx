@@ -507,8 +507,7 @@ export default function StoreBookkeepingPage() {
             <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="input">
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <button onClick={() => window.print()} className="btn btn-primary print:hidden">Print</button>
-            <button onClick={handleDownloadPDF} className="btn btn-primary print:hidden">Download PDF</button>
+            <button onClick={handleDownloadPDF} className="btn btn-primary text-sm print:hidden">Download PDF</button>
           </div>
 
           <h2 className="font-semibold hidden print:block">{storeName} — {MONTHS[selectedMonth - 1]} {selectedYear}</h2>
