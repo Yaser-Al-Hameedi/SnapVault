@@ -16,6 +16,17 @@ TEMP_FOLDER = "temp_uploads"
 os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 
+def get_user_id(authorization: str):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization token")
+    token = authorization.replace("Bearer ", "")
+    try:
+        user_response = supabase.auth.get_user(token)
+        return user_response.user.id
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+
+
 @router.post("/bookkeeping/extract")
 async def extract_report(file: UploadFile = File(...), authorization: str = Header(None)):
 
@@ -170,3 +181,48 @@ async def delete_entry(entry_id: str, authorization: str = Header(None)):
         raise HTTPException(status_code=404, detail= f"resourse not found")
     
     return {"message": "Deleted"}
+
+@router.get("/bookkeeping/summary")
+async def store_summaries(month: int, year: int, authorization: str = Header(None)):
+    user_id = get_user_id(authorization)
+    store_summaries = []
+
+    if user_id in ADMIN_USER_IDS:
+        response = get_supabase_client().table("stores").select("id, name").order("created_at").execute()
+    else:
+        response = get_supabase_client().table("stores").select("id, name").eq("user_id", user_id).order("created_at").execute()
+
+    stores = [{"id": s["id"], "name": s["name"]} for s in response.data]
+
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
+    
+    for store in stores:
+        db = get_supabase_client()
+
+        bookkeeping_entries = db.table("bookkeeping_entries").select("income, tax, payouts").eq("store_id", store["id"]).gte("entry_date", first_day).lte("entry_date", last_day).execute()
+
+        vendor_payments = db.table("vendor_payments").select("amount").eq("store_id", store["id"]).gte("payment_date", first_day).lte("payment_date", last_day).execute()
+
+        lottery = db.table("lottery_entries").select("amount").eq("store_id", store["id"]).lte("week_start", last_day).gte("week_end", first_day).execute()
+
+        income = sum(e["income"] for e in bookkeeping_entries.data)
+        payouts = sum(e["payouts"] for e in bookkeeping_entries.data)
+        tax = sum(e["tax"] for e in bookkeeping_entries.data)
+        vendor_total = sum(p["amount"] for p in vendor_payments.data)
+        lottery_total = sum(l["amount"] for l in lottery.data)
+        profit = income + lottery_total - payouts - vendor_total
+
+        store_summaries.append({
+            "store_id": store["id"],
+            "store_name": store["name"],
+            "income": income,
+            "payouts": payouts,
+            "tax": tax,
+            "vendor_total": vendor_total,
+            "lottery_total": lottery_total,
+            "profit": profit,
+        })
+
+    return store_summaries
+

@@ -22,6 +22,7 @@ export default function Header() {
               <Link href="/" className="text-slate-600 hover:text-slate-900">Dashboard</Link>
               <Link href="/documents" className="text-slate-600 hover:text-slate-900">Documents</Link>
               <Link href="/bookkeeping" className="text-slate-600 hover:text-slate-900">Bookkeeping</Link>
+              <Link href="/analytics" className="text-slate-600 hover:text-slate-900">Analytics</Link>
               <button onClick={handleSignOut} className="text-slate-600 hover:text-slate-900">
                 Sign Out
               </button>
