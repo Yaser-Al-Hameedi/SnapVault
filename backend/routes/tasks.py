@@ -31,15 +31,15 @@ def process_document_task(pending_storage_path: str, original_filename: str, con
         with open(temp_file_path, "wb") as f:
             f.write(file_bytes)
 
-        # OCR extraction
+        # OCR extraction (kept for extracted_text search field)
         ocr_start = time.time()
         extracted_text = ocr_service.extract_text(temp_file_path)
         print(f"[{original_filename}] OCR: {time.time() - ocr_start:.2f}s")
 
-        # AI field extraction
+        # AI field extraction via Claude vision (more accurate than OCR text)
         ai_start = time.time()
-        ai_data = ai_service.extract_fields(extracted_text)
-        print(f"[{original_filename}] AI extraction: {time.time() - ai_start:.2f}s")
+        ai_data = ai_service.extract_fields_from_image(temp_file_path)
+        print(f"[{original_filename}] AI vision extraction: {time.time() - ai_start:.2f}s")
 
         # Preparing final storage path
         unique_filename = f"{uuid.uuid4()}_{original_filename}"

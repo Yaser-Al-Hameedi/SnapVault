@@ -1,6 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Header
 from database import get_supabase_client, supabase
-from services import ocr_service
 from services import ai_service
 from models import BookeepingEntry, BookeepingUpdate
 import os
@@ -50,13 +49,8 @@ async def extract_report(file: UploadFile = File(...), authorization: str = Head
     with open(temp_file_path, "wb") as f:
         f.write(file_bytes)
 
-    # 3. Run OCR on the temp file
-
-    extracted_text = ocr_service.extract_text(temp_file_path)
-    
-    # 4. Call ai_service.extract_report_fields() with the OCR text
-
-    ai_data = ai_service.extract_report_fields(extracted_text)
+    # 3. Extract fields directly from image using Claude vision
+    ai_data = ai_service.extract_report_fields_from_image(temp_file_path)
     
     # 5. Clean up temp file
 
